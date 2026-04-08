@@ -97,7 +97,7 @@ function DashboardPage({
         <StatCard title="Packets/s" value={captureStatus?.packets_per_second ?? 0} icon={Activity} color="#3b82f6" />
         <StatCard title="Throughput" value={formatBytes(captureStatus?.bytes_per_second ?? 0) + "/s"} icon={Network} color="#a78bfa" />
         <StatCard title="Total Packets" value={(captureStatus?.total_packets ?? 0).toLocaleString()} icon={Server} color="#22c55e" />
-        <StatCard title="Active Alerts" value={captureStatus?.active_alerts ?? (summary?.by_severity ? Object.values(summary.by_severity).reduce((a, b) => a + b, 0) : 0)} icon={AlertTriangle} color="#f97316" />
+        <StatCard title="Total Alerts" value={summary?.by_severity ? Object.values(summary.by_severity).reduce((a, b) => a + b, 0) : 0} icon={AlertTriangle} color="#f97316" />
       </div>
 
       {/* Capture Control */}
@@ -607,7 +607,7 @@ function AlertSummaryPanel({ summary }: { summary: AlertSummary | null }) {
   return (
     <div className="bg-slate-800 rounded-xl p-5 border border-slate-700">
       <h3 className="text-slate-300 font-semibold mb-4 flex items-center gap-2">
-        <AlertTriangle size={16} className="text-amber-400" /> Active Alerts
+        <AlertTriangle size={16} className="text-amber-400" /> Alerts
       </h3>
       <div className="space-y-3">
         {severities.map(sev => {
@@ -653,7 +653,7 @@ function AlertTable({ alerts }: { alerts: Alert[] }) {
       {alerts.length === 0 ? (
         <div className="p-12 text-center text-slate-500">
           <Shield size={40} className="mx-auto mb-3 opacity-30" />
-          <p>No active alerts. Traffic looks clean.</p>
+          <p>No alerts detected yet.</p>
         </div>
       ) : (
         <div className="overflow-x-auto max-h-96 overflow-y-auto">
@@ -665,7 +665,7 @@ function AlertTable({ alerts }: { alerts: Alert[] }) {
                 <th className="px-4 py-2 font-medium">Title</th>
                 <th className="px-4 py-2 font-medium">Source</th>
                 <th className="px-4 py-2 font-medium">Proto</th>
-                <th className="px-4 py-2 font-medium">Method</th>
+                <th className="px-4 py-2 font-medium">Status</th>
               </tr>
             </thead>
             <tbody>
@@ -677,9 +677,9 @@ function AlertTable({ alerts }: { alerts: Alert[] }) {
                   <td className="px-4 py-2 text-slate-400 font-mono text-xs">{alert.source_ip}:{alert.source_port || "—"}</td>
                   <td className="px-4 py-2 text-slate-400">{alert.protocol}</td>
                   <td className="px-4 py-2">
-                    <span className={`text-xs px-2 py-0.5 rounded ${
-                      alert.detection_method === "signature" ? "bg-blue-500/20 text-blue-400" : "bg-purple-500/20 text-purple-400"
-                    }`}>{alert.detection_method}</span>
+                    <span className={`text-xs px-2 py-0.5 rounded font-medium ${
+                      alert.resolved ? "bg-slate-600/50 text-slate-400" : "bg-green-500/20 text-green-400"
+                    }`}>{alert.resolved ? "Resolved" : "Active"}</span>
                   </td>
                 </tr>
               ))}
@@ -778,7 +778,7 @@ export default function App() {
           api.getSummary(),
           api.getThroughput(5),
           api.getCaptureStatus(),
-          api.getAlerts({ limit: 50, resolved: false }),
+          api.getAlerts({ limit: 50 }),
         ]);
         if (summaryRes.success) setSummary(summaryRes.data);
         if (throughputRes.success) setThroughput(throughputRes.series);
@@ -822,8 +822,8 @@ export default function App() {
     await api.stopCapture();
     const res = await api.getCaptureStatus();
     if (res.success) setCaptureStatus(res.data);
-    // Reload alerts after stopping to reflect resolved count
-    const alertsRes = await api.getAlerts({ limit: 50, resolved: false });
+    // Reload alerts after stopping
+    const alertsRes = await api.getAlerts({ limit: 50 });
     if (alertsRes.success) setAlerts(alertsRes.alerts || []);
   }, []);
 

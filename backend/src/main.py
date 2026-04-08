@@ -156,19 +156,18 @@ async def start_attack_sim(body: dict):
 @app.post("/api/capture/stop")
 async def stop_capture():
     global synth_engine, attack_engine
-    # Resolve all active alerts and reset stats when stopping
-    resolved = await alert_manager.resolve_all_active("system")
+    # Reset stats when stopping (but keep alerts for historical record)
     alert_manager.reset_stats()
     if synth_engine and synth_engine.is_running:
         synth_engine.stop()
-        return {"success": True, "message": f"Synthetic traffic stopped, {resolved} alerts resolved"}
+        return {"success": True, "message": "Synthetic traffic stopped"}
     if attack_engine and attack_engine.is_running:
         attack_engine.stop()
-        return {"success": True, "message": f"Attack simulation stopped, {resolved} alerts resolved"}
+        return {"success": True, "message": "Attack simulation stopped"}
     if not capture_engine.is_running:
-        return {"success": True, "message": f"Capture not running, {resolved} alerts resolved"}
+        return {"success": True, "message": "Capture not running"}
     capture_engine.stop()
-    return {"success": True, "message": f"Capture stopped, {resolved} alerts resolved"}
+    return {"success": True, "message": "Capture stopped"}
 
 
 @app.get("/api/capture/interfaces")
