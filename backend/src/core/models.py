@@ -1,5 +1,6 @@
 from pydantic_settings import BaseSettings
 from functools import lru_cache
+import uuid
 
 
 class Settings(BaseSettings):
@@ -15,3 +16,7 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
+
+
+def generate_uuid():
+    return str(uuid.uuid4())

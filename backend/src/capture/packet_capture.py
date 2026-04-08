@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Optional, List, Callable, Dict, Any
 from dataclasses import dataclass, field
 from queue import Queue, Empty
+from datetime import datetime
 import logging
 
 from ..utils.logger import get_logger
@@ -12,6 +13,30 @@ from ..utils.config import get_config
 
 logger = get_logger(__name__)
 TSHARK_PATH = r"C:\Program Files\Wireshark\tshark.exe"
+
+
+@dataclass
+class PacketInfo:
+    """Internal packet representation used by synthetic.py, attack_simulator.py, and alert_manager."""
+    timestamp: datetime
+    raw_data: bytes
+    src_ip: str
+    dst_ip: str
+    src_port: int
+    dst_port: int
+    protocol: str
+    length: int
+    flags: str
+    payload_preview: bytes
+    ttl: int = 64
+    ip_length: int = 0
+    tcp_flags_int: int = 0
+    tcp_seq: int = 0
+    tcp_ack: int = 0
+    window_size: int = 0
+    checksum: int = 0
+    dns_query: str = ""
+    http_method: str = ""
 
 
 @dataclass
@@ -140,7 +165,47 @@ class PacketCapture:
         self.config = config or get_config()
         self._session: Optional[CaptureSession] = None
         self._capture_lock = threading.Lock()
+        self._callback: Optional[Callable] = None
 
+    # ── Compatibility aliases used by main.py ──────────────────
+    @property
+    def is_running(self) -> bool:
+        """Alias for is_capturing() — used by main.py."""
+        return self.is_capturing()
+
+    def start(self, interface: Optional[str] = None, bpf_filter: str = "") -> CaptureSession:
+        """Alias for start_capture() — used by main.py."""
+        return self.start_capture(interface=interface, bpf_filter=bpf_filter)
+
+    def stop(self):
+        """Stop capture — used by main.py."""
+        self.stop_capture()
+
+    def get_interfaces(self) -> List[Dict[str, Any]]:
+        """Alias for get_available_interfaces() — used by main.py."""
+        return self.get_available_interfaces()
+
+    def set_callback(self, callback: Callable) -> None:
+        """Set callback for packet processing — used by main.py."""
+        self._callback = callback
+        # If session already running, update its callback
+        if self._session and self._session.running:
+            # The session will call the callback on each packet
+            pass
+
+    def get_stats(self) -> Dict[str, Any]:
+        """Return current capture stats — used by main.py."""
+        if self._session:
+            s = self._session.get_stats()
+            return {
+                "total_packets": s.packets_captured,
+                "total_bytes": s.bytes_captured,
+                "packets_per_second": s.packets_per_second,
+                "buffer_size": self._session.packet_queue.qsize() if hasattr(self._session.packet_queue, 'qsize') else 0,
+            }
+        return {"total_packets": 0, "total_bytes": 0, "packets_per_second": 0, "buffer_size": 0}
+
+    # ── Original methods ─────────────────────────────────────
     def get_available_interfaces(self) -> List[Dict[str, Any]]:
         interfaces = []
         try:
@@ -166,6 +231,11 @@ class PacketCapture:
                 if interfaces: interface = interfaces[0]['name']
                 else: raise RuntimeError("No network interfaces found")
             filter_str = bpf_filter or self.config.capture.filter
+            # Use stored callback if none provided
+            cb = callback or self._callback
+            should_simulate = simulate or not os.path.exists(TSHARK_PATH)
+            self._session = CaptureSession(interface, filter_str, output_file, simulate=should_simulate)
+            self._session.start(cb); return self._session
             should_simulate = simulate or not os.path.exists(TSHARK_PATH)
             self._session = CaptureSession(interface, filter_str, output_file, simulate=should_simulate)
             self._session.start(callback); return self._session

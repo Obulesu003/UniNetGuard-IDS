@@ -9,13 +9,11 @@ import {
 } from "lucide-react";
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell,
 } from "recharts";
 
 const SEVERITY_COLORS: Record<string, string> = {
   critical: "#ef4444", high: "#f97316", medium: "#eab308", low: "#22c55e",
 };
-const PROTOCOL_COLORS = ["#3b82f6", "#8b5cf6", "#ec4899", "#6b7280", "#f97316"];
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -85,11 +83,11 @@ function NavBar({ page, setPage }: { page: Page; setPage: (p: Page) => void }) {
 
 function DashboardPage({
   alerts, captureStatus, summary, throughput,
-  onStart, onStop, onAttackSim, onLiveCapture,
+  onStop, onAttackSim, onLiveCapture,
 }: {
   alerts: Alert[]; captureStatus: any; summary: AlertSummary | null;
   throughput: ThroughputPoint[];
-  onStart: (iface: string, pps: number) => void; onStop: () => void;
+  onStop: () => void;
   onAttackSim: (iface: string) => void; onLiveCapture: (iface: string) => void;
 }) {
   return (
@@ -103,7 +101,7 @@ function DashboardPage({
       </div>
 
       {/* Capture Control */}
-      <CaptureControl status={captureStatus} onStart={onStart} onStop={onStop} onAttackSim={onAttackSim} onLiveCapture={onLiveCapture} />
+      <CaptureControl status={captureStatus} onStop={onStop} onAttackSim={onAttackSim} onLiveCapture={onLiveCapture} />
 
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
@@ -602,40 +600,6 @@ function ThroughputChart({ data }: { data: ThroughputPoint[] }) {
   );
 }
 
-function ProtocolChart({ stats }: { stats: LiveStats | null }) {
-  if (!stats) return null;
-  const data = [
-    { name: "TCP", value: stats.protocols.tcp },
-    { name: "UDP", value: stats.protocols.udp },
-    { name: "ICMP", value: stats.protocols.icmp },
-    { name: "Other", value: stats.protocols.other },
-  ].filter(d => d.value > 0);
-  if (data.length === 0) return null;
-  return (
-    <div className="bg-slate-800 rounded-xl p-5 border border-slate-700">
-      <h3 className="text-slate-300 font-semibold mb-4 flex items-center gap-2">
-        <Network size={16} className="text-purple-400" /> Protocol Distribution
-      </h3>
-      <div className="flex items-center gap-6">
-        <ResponsiveContainer width={120} height={120}>
-          <PieChart><Pie data={data} cx="50%" cy="50%" innerRadius={30} outerRadius={55} dataKey="value">
-            {data.map((_, i) => <Cell key={i} fill={PROTOCOL_COLORS[i % PROTOCOL_COLORS.length]} />)}
-          </Pie></PieChart>
-        </ResponsiveContainer>
-        <div className="space-y-2">
-          {data.map((d, i) => (
-            <div key={d.name} className="flex items-center gap-2 text-sm">
-              <div className="w-3 h-3 rounded-sm" style={{ background: PROTOCOL_COLORS[i % PROTOCOL_COLORS.length] }} />
-              <span className="text-slate-400">{d.name}</span>
-              <span className="text-slate-200 font-mono">{d.value.toLocaleString()}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function AlertSummaryPanel({ summary }: { summary: AlertSummary | null }) {
   if (!summary) return null;
   const severities = ["critical", "high", "medium", "low"];
@@ -727,15 +691,13 @@ function AlertTable({ alerts }: { alerts: Alert[] }) {
   );
 }
 
-function CaptureControl({ status, onStart, onStop, onAttackSim, onLiveCapture }: {
+function CaptureControl({ status, onStop, onAttackSim, onLiveCapture }: {
   status: any;
-  onStart: (iface: string, pps: number) => void;
   onStop: () => void;
   onAttackSim: (iface: string) => void;
   onLiveCapture: (iface: string) => void;
 }) {
   const [selectedIface, setSelectedIface] = useState("Wi-Fi");
-  const [loading, setLoading] = useState(false);
 
   const isRunning = status?.is_running;
   const mode = status?.mode;
@@ -757,13 +719,13 @@ function CaptureControl({ status, onStart, onStop, onAttackSim, onLiveCapture }:
         {/* Attack Simulation — sends real packets, triggers real detection */}
         {!isRunning ? (
           <>
-            <button onClick={() => { setLoading(true); onAttackSim(selectedIface); setLoading(false); }}
+            <button onClick={() => onAttackSim(selectedIface)}
               className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg text-sm transition font-medium">
               <Zap size={14} /> Attack Simulation
             </button>
 
             {/* Live Capture — passive, captures existing traffic */}
-            <button onClick={() => { setLoading(true); onLiveCapture(selectedIface); setLoading(false); }}
+            <button onClick={() => onLiveCapture(selectedIface)}
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm transition">
               <Wifi size={14} /> Live Capture
             </button>
@@ -833,7 +795,7 @@ export default function App() {
   // Sync socket alerts into React state (real-time)
   useEffect(() => {
     if (socketAlerts.length > 0) {
-      setAlerts(prev => {
+      setAlerts((prev: Alert[]) => {
         const existing = new Set(prev.map(a => a.id));
         const newAlerts = socketAlerts.filter(a => !existing.has(a.id));
         if (newAlerts.length === 0) return prev;
@@ -845,7 +807,7 @@ export default function App() {
   // Sync socket stats into capture status (real-time dashboard)
   useEffect(() => {
     if (liveStats) {
-      setCaptureStatus(prev => ({
+      setCaptureStatus((prev: Record<string, unknown>) => ({
         ...(prev || {}),
         packets_per_second: liveStats.packets_per_second,
         bytes_per_second: liveStats.bytes_per_second,
@@ -855,16 +817,6 @@ export default function App() {
       }));
     }
   }, [liveStats]);
-
-  const handleStart = useCallback(async (iface: string, pps: number) => {
-    if (iface === "synthetic") {
-      await api.startCapture({ synthetic_pps: pps });
-    } else {
-      await api.startCapture({ interface: iface });
-    }
-    const res = await api.getCaptureStatus();
-    if (res.success) setCaptureStatus(res.data);
-  }, []);
 
   const handleStop = useCallback(async () => {
     await api.stopCapture();
@@ -876,7 +828,7 @@ export default function App() {
   }, []);
 
   const handleAttackSim = useCallback(async (iface: string) => {
-    const res = await api.startAttackSim({ interface: iface });
+    const res = await api.startAttackSim({ interface: iface }) as { success: boolean };
     if (res.success) {
       const captureRes = await api.getCaptureStatus();
       if (captureRes.success) setCaptureStatus(captureRes.data);
@@ -920,7 +872,7 @@ export default function App() {
         <DashboardPage
           alerts={alerts} captureStatus={captureStatus} summary={summary}
           throughput={throughput}
-          onStart={handleStart} onStop={handleStop}
+          onStop={handleStop}
           onAttackSim={handleAttackSim} onLiveCapture={handleLiveCapture}
         />
       )}

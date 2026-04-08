@@ -52,7 +52,7 @@ class CapturedPacket(Base):
     dns_query = Column(String(255), nullable=True)
     http_method = Column(String(20), nullable=True)
     payload_preview = Column(Text, nullable=True)
-    raw_hex = Column(Text, nullable=True)  # First 64 bytes as hex
+    raw_hex = Column(Text, nullable=True)
     is_alert = Column(Boolean, default=False, index=True)
     alert_id = Column(String(36), nullable=True)
 
@@ -84,4 +84,3 @@ class TrafficStats(Base):
     udp_count = Column(Integer, default=0)
     icmp_count = Column(Integer, default=0)
     other_count = Column(Integer, default=0)
-

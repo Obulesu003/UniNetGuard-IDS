@@ -6,10 +6,12 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: ids-backend
-    network_mode: host
+    network_mode: bridge
     cap_add:
       - NET_ADMIN
       - NET_RAW
+    ports:
+      - "8000:8000"
     volumes:
       - ./backend/src:/app/src
     environment:
@@ -25,5 +27,4 @@ services:
       - "3000:80"
     depends_on:
       - ids-backend
-
-networks: {}
+    restart: unless-stopped
