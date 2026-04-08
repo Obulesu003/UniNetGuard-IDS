@@ -319,9 +319,41 @@ async def packet_stats(db: AsyncSession = Depends(get_db)):
 # ── Stats Endpoints ─────────────────────────────────────────
 
 @router.get("/stats/overview")
-async def get_stats():
+async def get_stats(db: AsyncSession = Depends(get_db)):
+    # Get stats from DB for historical accuracy
+    from src.core.schemas import Alert, CapturedPacket
+    from sqlalchemy import select, func
+
+    # Total packets and bytes from DB
+    total_packets = await db.scalar(select(func.count(CapturedPacket.id)))
+    total_bytes = await db.scalar(select(func.sum(CapturedPacket.length)))
+
+    # Protocol distribution from DB
+    proto_result = await db.execute(
+        select(CapturedPacket.protocol, func.count(CapturedPacket.id))
+        .group_by(CapturedPacket.protocol)
+    )
+    protocols = {"tcp": 0, "udp": 0, "icmp": 0, "other": 0}
+    for proto, count in proto_result.all():
+        key = proto.lower() if proto.lower() in protocols else "other"
+        if key in protocols:
+            protocols[key] = count
+
+    # Active (unresolved) alerts
+    active_alerts = await db.scalar(
+        select(func.count(Alert.id)).where(Alert.resolved == False)
+    )
+
+    # Also get live stats for pps/bps (these reset on restart, so use DB as fallback)
     live = alert_manager.get_live_stats()
-    live["active_alerts"] = await alert_manager.get_active_alert_count()
+    # Use DB totals if live stats are 0 (backend was restarted)
+    if live["total_packets"] == 0 and total_packets:
+        live["total_packets"] = total_packets
+        live["total_bytes"] = total_bytes or 0
+
+    live["protocols"] = protocols
+    live["active_alerts"] = active_alerts or 0
+
     return {"success": True, "data": live}
 
 
