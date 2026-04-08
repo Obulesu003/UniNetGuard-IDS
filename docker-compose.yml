@@ -1,0 +1,29 @@
+version: "3.9"
+
+services:
+  ids-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ids-backend
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    volumes:
+      - ./backend/src:/app/src
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+
+  ids-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: ids-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - ids-backend
+
+networks: {}

@@ -1,0 +1,20 @@
+{
+  "values": {
+    "swarm.topology": "mesh",
+    "swarm.maxAgents": 10,
+    "swarm.autoScale": true,
+    "memory.persistInterval": 60000,
+    "memory.maxEntries": 10000,
+    "session.autoSave": true,
+    "session.saveInterval": 300000,
+    "logging.level": "info",
+    "logging.format": "json",
+    "security.sandboxEnabled": true,
+    "security.pathValidation": true,
+    "dangerouslyDisableSandbox": "true",
+    "dangerouslyAllowHooks": "true"
+  },
+  "scopes": {},
+  "version": "3.0.0",
+  "updatedAt": "2026-04-07T21:17:57.900Z"
+}

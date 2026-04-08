@@ -1,0 +1,43 @@
+capture:
+  interface: "auto"
+  filter: ""
+  buffer_size: 10000
+  output_dir: "./data/captured"
+
+ml:
+  model_path: "./models/traffic_classifier.pkl"
+  confidence_threshold: 0.85
+  training_data: "./data/cicids2017_sample.csv"
+
+ai:
+  provider: "openai"
+  api_key: ""
+  model: "gpt-3.5-turbo"
+  explanation_level: "detailed"
+
+alerts:
+  email:
+    enabled: false
+    smtp_host: "smtp.gmail.com"
+    smtp_port: 587
+    username: ""
+    password: ""
+    recipients: []
+  sms:
+    enabled: false
+    twilio_sid: ""
+    twilio_token: ""
+    from_number: ""
+    to_numbers: []
+  slack:
+    enabled: false
+    webhook_url: ""
+
+dashboard:
+  host: "0.0.0.0"
+  port: 5000
+  refresh_interval: 5
+
+export:
+  csv_dir: "./data/exports"
+  pdf_dir: "./data/reports"

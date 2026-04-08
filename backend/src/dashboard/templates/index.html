@@ -1,0 +1,2958 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Netwatcher - Network Traffic Analyzer & IDS</title>
+    <script>const NETWATCHER_VERSION = '2.1.0';</script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        :root {
+            --bg-dark: #0a0e17;
+            --bg-card: #111827;
+            --bg-hover: #1f2937;
+            --bg-input: #1f2937;
+            --text-primary: #f9fafb;
+            --text-secondary: #9ca3af;
+            --accent-blue: #3b82f6;
+            --accent-green: #10b981;
+            --accent-yellow: #f59e0b;
+            --accent-red: #ef4444;
+            --accent-purple: #8b5cf6;
+            --accent-orange: #f97316;
+            --border-color: #374151;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-primary);
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+            min-height: 100vh;
+            margin: 0;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 260px;
+            height: 100vh;
+            background: var(--bg-card);
+            border-right: 1px solid var(--border-color);
+            padding: 20px 0;
+            overflow-y: auto;
+            z-index: 1000;
+        }
+
+        .sidebar-brand {
+            padding: 0 20px 20px;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 20px;
+        }
+
+        .sidebar-brand h4 {
+            margin: 0;
+            color: var(--accent-blue);
+            font-weight: 700;
+            font-size: 1.4rem;
+        }
+
+        .sidebar-brand small {
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+        }
+
+        .sidebar-nav {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .sidebar-nav li {
+            margin: 2px 10px;
+        }
+
+        .sidebar-nav a {
+            display: flex;
+            align-items: center;
+            padding: 12px 15px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            border-radius: 8px;
+            transition: all 0.2s;
+            font-size: 0.9rem;
+        }
+
+        .sidebar-nav a:hover, .sidebar-nav a.active {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+        .sidebar-nav a.active {
+            border-left: 3px solid var(--accent-blue);
+            background: rgba(59, 130, 246, 0.1);
+        }
+
+        .sidebar-nav i {
+            width: 24px;
+            margin-right: 12px;
+            font-size: 1.1rem;
+        }
+
+        /* Main Content */
+        .main-content {
+            margin-left: 260px;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        /* Top Bar */
+        .topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 25px;
+            background: var(--bg-card);
+            border-radius: 12px;
+            margin-bottom: 20px;
+            border: 1px solid var(--border-color);
+        }
+
+        .topbar-title {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .topbar-title h2 {
+            margin: 0;
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+        }
+
+        .status-badge.active {
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--accent-green);
+        }
+
+        .status-badge.inactive {
+            background: rgba(156, 163, 175, 0.15);
+            color: var(--text-secondary);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .status-badge.active .status-dot {
+            background: var(--accent-green);
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* Cards */
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+
+        .card-header {
+            background: transparent;
+            border-bottom: 1px solid var(--border-color);
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .card-header h5 {
+            margin: 0;
+            font-size: 1rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--text-primary);
+        }
+
+        .card-body { padding: 20px; }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            transition: all 0.3s;
+        }
+
+        .stat-card:hover {
+            border-color: var(--accent-blue);
+            transform: translateY(-2px);
+        }
+
+        .stat-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .stat-card-icon {
+            width: 45px;
+            height: 45px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.3rem;
+        }
+
+        .stat-card-value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .stat-card-label {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            margin-top: 5px;
+        }
+
+        .stat-card-trend {
+            font-size: 0.75rem;
+            margin-top: 8px;
+            color: var(--text-secondary);
+        }
+
+        /* Buttons */
+        .btn-primary-custom {
+            background: linear-gradient(135deg, var(--accent-blue), #1d4ed8);
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+        }
+
+        .btn-primary-custom:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
+            color: white;
+        }
+
+        .btn-danger-custom {
+            background: linear-gradient(135deg, var(--accent-red), #b91c1c);
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+        }
+
+        .btn-success-custom {
+            background: linear-gradient(135deg, var(--accent-green), #047857);
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+        }
+
+        /* Spinner animation */
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .spin {
+            animation: spin 1s linear infinite;
+            display: inline-block;
+        }
+
+        /* Packet Table */
+        .packet-table-container {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .packet-table {
+            width: 100%;
+            border-collapse: collapse;
+            color: var(--text-primary);
+        }
+
+        .packet-table th {
+            background: var(--bg-hover);
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .packet-table td {
+            padding: 12px;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 0.9rem;
+            color: var(--text-primary);
+        }
+
+        .packet-table tr:hover {
+            background: var(--bg-hover);
+        }
+
+        /* Badges */
+        .protocol-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 700;
+        }
+
+        .protocol-TCP { background: rgba(59, 130, 246, 0.2); color: var(--accent-blue); }
+        .protocol-UDP { background: rgba(16, 185, 129, 0.2); color: var(--accent-green); }
+        .protocol-ICMP { background: rgba(245, 158, 11, 0.2); color: var(--accent-yellow); }
+
+        .severity-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .severity-CRITICAL { background: var(--accent-red); color: white; }
+        .severity-HIGH { background: rgba(239, 68, 68, 0.2); color: var(--accent-red); border: 1px solid var(--accent-red); }
+        .severity-MEDIUM { background: rgba(245, 158, 11, 0.2); color: var(--accent-yellow); border: 1px solid var(--accent-yellow); }
+        .severity-LOW { background: rgba(16, 185, 129, 0.2); color: var(--accent-green); border: 1px solid var(--accent-green); }
+
+        .threat-badge {
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .threat-badge.normal { background: rgba(16, 185, 129, 0.2); color: var(--accent-green); }
+        .threat-badge.suspicious { background: rgba(245, 158, 11, 0.2); color: var(--accent-yellow); }
+        .threat-badge.dangerous { background: rgba(239, 68, 68, 0.2); color: var(--accent-red); }
+
+        .ip-badge {
+            background: var(--bg-hover);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 0.85rem;
+            color: var(--accent-blue);
+        }
+
+        /* Alert Item */
+        .alert-item {
+            background: var(--bg-hover);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-left: 4px solid var(--accent-red);
+        }
+
+        .alert-item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .alert-item-body {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        /* Threat Level */
+        .threat-level {
+            text-align: center;
+            padding: 25px;
+        }
+
+        .threat-icon {
+            font-size: 5rem;
+            margin-bottom: 15px;
+        }
+
+        .threat-level-text {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 15px;
+            color: var(--text-primary);
+        }
+
+        .threat-progress {
+            height: 10px;
+            border-radius: 5px;
+            background: var(--bg-dark);
+            overflow: hidden;
+        }
+
+        .threat-progress-bar {
+            height: 100%;
+            border-radius: 5px;
+            transition: width 0.5s;
+        }
+
+        /* Chart Container */
+        .chart-container {
+            position: relative;
+            height: 300px;
+        }
+
+        /* Tab Content */
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* Grid Layouts */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 1200px) {
+            .dashboard-grid { grid-template-columns: 1fr; }
+        }
+
+        /* Loading Spinner */
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--border-color);
+            border-top-color: var(--accent-blue);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* MITRE Badge */
+        .mitre-badge {
+            background: var(--bg-hover);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            color: var(--accent-purple);
+            border: 1px solid var(--accent-purple);
+        }
+
+        /* IOC Badge */
+        .ioc-badge {
+            background: rgba(139, 92, 246, 0.2);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            color: var(--accent-purple);
+        }
+
+        /* Summary Box */
+        .summary-box {
+            background: var(--bg-hover);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+
+        .summary-box h6 {
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+        }
+
+        /* Form Controls */
+        .form-control, .form-select {
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+        }
+
+        .form-control:focus, .form-select:focus {
+            background: var(--bg-input);
+            border-color: var(--accent-blue);
+            color: var(--text-primary);
+            box-shadow: 0 0 0 0.2rem rgba(59, 130, 246, 0.25);
+        }
+
+        .form-control::placeholder {
+            color: var(--text-secondary);
+        }
+
+        .form-label {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .form-range::-webkit-slider-thumb {
+            background: var(--accent-blue);
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-dark);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-secondary);
+        }
+
+        /* Insight Card */
+        .insight-card {
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(139, 92, 246, 0.1));
+            border: 1px solid var(--accent-blue);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 15px;
+        }
+
+        .insight-card h6 {
+            color: var(--accent-blue);
+            font-size: 0.9rem;
+            margin-bottom: 10px;
+        }
+
+        .insight-card p {
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            margin: 0;
+        }
+
+        /* Report Preview */
+        .report-preview {
+            background: var(--bg-hover);
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 15px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .report-preview h4 {
+            color: var(--accent-blue);
+            margin-bottom: 15px;
+        }
+
+        .report-preview h5 {
+            color: var(--text-primary);
+            margin: 15px 0 10px;
+            font-size: 1rem;
+        }
+
+        .report-preview table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+            color: var(--text-primary);
+        }
+
+        .report-preview th, .report-preview td {
+            padding: 8px;
+            border: 1px solid var(--border-color);
+            text-align: left;
+            font-size: 0.85rem;
+        }
+
+        .report-preview th {
+            background: var(--bg-dark);
+            color: var(--text-secondary);
+        }
+    </style>
+</head>
+<body>
+    <!-- Sidebar -->
+    <nav class="sidebar">
+        <div class="sidebar-brand">
+            <h4><i class="bi bi-shield-check"></i> Netwatcher</h4>
+            <small>Network IDS & Traffic Analyzer</small>
+        </div>
+
+        <ul class="sidebar-nav">
+            <li>
+                <a href="#" class="active" data-tab="dashboard" onclick="showTab('dashboard'); return false;">
+                    <i class="bi bi-grid-1x2"></i> Dashboard
+                </a>
+            </li>
+            <li>
+                <a href="#" data-tab="packets" onclick="showTab('packets'); return false;">
+                    <i class="bi bi-table"></i> Packet Monitor
+                </a>
+            </li>
+            <li>
+                <a href="#" data-tab="analytics" onclick="showTab('analytics'); return false;">
+                    <i class="bi bi-graph-up"></i> Analytics
+                </a>
+            </li>
+            <li>
+                <a href="#" data-tab="alerts" onclick="showTab('alerts'); return false;">
+                    <i class="bi bi-bell"></i> Alerts <span id="alertBadge" class="badge bg-danger" style="display:none;">0</span>
+                </a>
+            </li>
+            <li>
+                <a href="#" data-tab="reports" onclick="showTab('reports'); return false;">
+                    <i class="bi bi-file-earmark-text"></i> Reports
+                </a>
+            </li>
+            <li>
+                <a href="#" data-tab="settings" onclick="showTab('settings'); return false;">
+                    <i class="bi bi-gear"></i> Settings
+                </a>
+            </li>
+        </ul>
+
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Top Bar -->
+        <div class="topbar">
+            <div class="topbar-title">
+                <h2 id="pageTitle">Dashboard</h2>
+                <div class="status-badge inactive" id="statusBadge">
+                    <span class="status-dot"></span>
+                    <span id="statusText">Inactive</span>
+                </div>
+                <span id="jsVersion" class="badge bg-secondary" style="font-size:10px; position:absolute; right:10px; top:10px; display:none;">JS v2.1</span>
+            </div>
+
+            <div class="action-buttons">
+                <button class="btn btn-primary-custom" id="captureBtn" onclick="toggleCapture()">
+                    <i class="bi bi-play-fill"></i> Start Capture
+                </button>
+                <button class="btn btn-outline-danger" onclick="showMaliciousPackets()" style="color: var(--accent-red); border-color: var(--accent-red);" id="maliciousBtn">
+                    <i class="bi bi-bug"></i> Threats <span id="maliciousCount" class="badge bg-danger">0</span>
+                </button>
+                <button class="btn btn-outline-secondary" onclick="showSessionsModal()" style="color: var(--text-secondary); border-color: var(--border-color);">
+                    <i class="bi bi-folder-check"></i> Sessions
+                </button>
+            </div>
+        </div>
+
+        <!-- Dashboard Tab -->
+        <div id="tab-dashboard" class="tab-content active">
+            <!-- Executive Summary -->
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="bi bi-clipboard-data"></i> Executive Summary</h5>
+                    <small id="summaryTime" style="color: var(--text-secondary);">Last updated: --</small>
+                </div>
+                <div class="card-body">
+                    <div class="summary-box">
+                        <h6><i class="bi bi-info-circle"></i> Current Situation</h6>
+                        <p id="situationSummary" style="color: var(--text-primary);">Start capture to analyze network traffic and detect potential threats.</p>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="summary-box">
+                                <h6><i class="bi bi-shield-check"></i> Security Posture</h6>
+                                <p id="securityPosture" style="color: var(--accent-green); font-size: 1.1rem; font-weight: 600;">SECURE</p>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="summary-box">
+                                <h6><i class="bi bi-exclamation-triangle"></i> Active Threats</h6>
+                                <p id="activeThreats" style="color: var(--text-primary); font-size: 1.1rem; font-weight: 600;">0</p>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="summary-box">
+                                <h6><i class="bi bi-clock-history"></i> Session Time</h6>
+                                <p id="sessionDuration" style="color: var(--text-primary); font-size: 1.1rem; font-weight: 600;">0:00</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stats Grid -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-card-header">
+                        <div>
+                            <div class="stat-card-value" id="statPackets">0</div>
+                            <div class="stat-card-label">Total Packets</div>
+                        </div>
+                        <div class="stat-card-icon" style="background: rgba(59, 130, 246, 0.2); color: var(--accent-blue);">
+                            <i class="bi bi-package"></i>
+                        </div>
+                    </div>
+                    <div class="stat-card-trend" id="ppsTrend"><i class="bi bi-arrow-up"></i> <span id="statPps">0</span> packets/sec</div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-card-header">
+                        <div>
+                            <div class="stat-card-value" id="statBytes">0 B</div>
+                            <div class="stat-card-label">Data Volume</div>
+                        </div>
+                        <div class="stat-card-icon" style="background: rgba(139, 92, 246, 0.2); color: var(--accent-purple);">
+                            <i class="bi bi-cloud-arrow-up"></i>
+                        </div>
+                    </div>
+                    <div class="stat-card-trend" id="bpsTrend"><i class="bi bi-arrow-right"></i> <span id="statBps">0 B/s</span></div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-card-header">
+                        <div>
+                            <div class="stat-card-value" id="statSrcIps">0</div>
+                            <div class="stat-card-label">Source IPs</div>
+                        </div>
+                        <div class="stat-card-icon" style="background: rgba(16, 185, 129, 0.2); color: var(--accent-green);">
+                            <i class="bi bi-person"></i>
+                        </div>
+                    </div>
+                    <div class="stat-card-trend" id="ipTrend"><i class="bi bi-globe"></i> <span id="statDstIps">0</span> destinations</div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-card-header">
+                        <div>
+                            <div class="stat-card-value" id="statAlerts">0</div>
+                            <div class="stat-card-label">Alerts</div>
+                        </div>
+                        <div class="stat-card-icon" style="background: rgba(239, 68, 68, 0.2); color: var(--accent-red);">
+                            <i class="bi bi-exclamation-triangle"></i>
+                        </div>
+                    </div>
+                    <div class="stat-card-trend" id="alertTrend"><span id="criticalCount">0</span> critical</div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-card-header">
+                        <div>
+                            <div class="stat-card-value" id="statThreats">0</div>
+                            <div class="stat-card-label">Threats Detected</div>
+                        </div>
+                        <div class="stat-card-icon" style="background: rgba(249, 115, 22, 0.2); color: var(--accent-orange);">
+                            <i class="bi bi-bug"></i>
+                        </div>
+                    </div>
+                    <div class="stat-card-trend" id="threatTrend">Last: <span id="lastThreat">None</span></div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-card-header">
+                        <div>
+                            <div class="stat-card-value" id="statDetectionRate">--%</div>
+                            <div class="stat-card-label">Detection Rate</div>
+                        </div>
+                        <div class="stat-card-icon" style="background: rgba(245, 158, 11, 0.2); color: var(--accent-yellow);">
+                            <i class="bi bi-radar"></i>
+                        </div>
+                    </div>
+                    <div class="stat-card-trend" id="detectionTrend">Accuracy: <span id="modelAccuracySmall">100%</span></div>
+                </div>
+            </div>
+
+            <!-- Dashboard Grid -->
+            <div class="dashboard-grid">
+                <div>
+                    <!-- Traffic Chart -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-graph-up"></i> Real-Time Traffic</h5>
+                            <span id="trafficStatus" style="color: var(--text-secondary); font-size: 0.8rem;">No data</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="chart-container">
+                                <canvas id="trafficChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Protocol & Attack Distribution -->
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5><i class="bi bi-pie-chart"></i> Protocol Distribution</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="chart-container" style="height: 250px;">
+                                        <canvas id="protocolChart"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5><i class="bi bi-shield-exclamation"></i> Attack Types</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="chart-container" style="height: 250px;">
+                                        <canvas id="attackChart"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Recent Packets Preview -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-lightning"></i> Recent Packets</h5>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="showTab('packets')" style="color: var(--text-secondary); border-color: var(--border-color);">View All</button>
+                        </div>
+                        <div class="card-body packet-table-container">
+                            <table class="packet-table" id="recentPacketsTable">
+                                <thead>
+                                    <tr>
+                                        <th>Time</th>
+                                        <th>Source</th>
+                                        <th>Destination</th>
+                                        <th>Protocol</th>
+                                        <th>Size</th>
+                                        <th>Classification</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="recentPacketsBody">
+                                    <tr><td colspan="6" style="text-align: center; color: var(--text-secondary);">No packets captured yet</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <!-- Threat Assessment -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-shield-check"></i> Threat Assessment</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="threat-level">
+                                <div class="threat-icon" id="threatIcon">
+                                    <i class="bi bi-shield-check" style="color: var(--accent-green);"></i>
+                                </div>
+                                <div class="threat-level-text" id="threatText" style="color: var(--accent-green);">Network Secure</div>
+                                <div class="threat-progress">
+                                    <div class="threat-progress-bar" id="threatProgress" style="width: 0%; background: var(--accent-green);"></div>
+                                </div>
+                            </div>
+                            <div class="row text-center mt-4">
+                                <div class="col-4">
+                                    <div style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary);" id="summaryConfidence">--%</div>
+                                    <small style="color: var(--text-secondary);">Confidence</small>
+                                </div>
+                                <div class="col-4">
+                                    <div style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary);" id="summarySeverity">-</div>
+                                    <small style="color: var(--text-secondary);">Severity</small>
+                                </div>
+                                <div class="col-4">
+                                    <div style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary);" id="summaryCategory">-</div>
+                                    <small style="color: var(--text-secondary);">Category</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- AI Analysis -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-robot"></i> AI Analysis</h5>
+                            <span class="badge" id="aiProvider" style="background: var(--accent-purple); color: white;">Template</span>
+                        </div>
+                        <div class="card-body" id="aiAnalysisBox" style="color: var(--text-primary);">
+                            <p style="color: var(--text-secondary);">
+                                <i class="bi bi-info-circle"></i> Start capture to analyze traffic patterns.
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Recent Alerts -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-bell"></i> Recent Alerts</h5>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="clearAlerts()" style="color: var(--text-secondary); border-color: var(--border-color);">Clear</button>
+                        </div>
+                        <div class="card-body" id="alertsBox" style="max-height: 300px; overflow-y: auto;">
+                            <p style="color: var(--text-secondary);">
+                                <i class="bi bi-bell-slash"></i> No alerts triggered yet.
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Top Ports -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-hdd-network"></i> Top Ports (IOC)</h5>
+                        </div>
+                        <div class="card-body">
+                            <table class="packet-table" id="topPortsTable">
+                                <thead>
+                                    <tr>
+                                        <th>Port</th>
+                                        <th>Service</th>
+                                        <th>Desc</th>
+                                        <th>Count</th>
+                                        <th>Risk</th>
+                                        <th>Attack Type</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="topPortsBody">
+                                    <tr><td colspan="6" style="text-align: center; color: var(--text-secondary);">No data</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Packets Tab -->
+        <div id="tab-packets" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="bi bi-table"></i> Packet Monitor</h5>
+                    <div class="d-flex gap-2">
+                        <input type="text" class="form-control" placeholder="Search packets..." id="packetFilter" style="width: 200px;">
+                        <select class="form-select" id="protocolFilter" style="width: 120px;">
+                            <option value="">All Protocols</option>
+                            <option value="TCP">TCP</option>
+                            <option value="UDP">UDP</option>
+                            <option value="ICMP">ICMP</option>
+                        </select>
+                        <select class="form-select" id="threatFilter" style="width: 140px;">
+                            <option value="">All Traffic</option>
+                            <option value="threat">Threats Only</option>
+                            <option value="normal">Normal Only</option>
+                        </select>
+                        <label class="btn btn-sm btn-outline-success" style="color: #10b981; border-color: #10b981; cursor: pointer;">
+                            <i class="bi bi-upload"></i> Import
+                            <input type="file" id="importFile" accept=".json,.csv,.pcap" style="display: none;" onchange="importPackets(this.files[0])">
+                        </label>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="clearPackets()" style="color: var(--text-secondary); border-color: var(--border-color);">Clear</button>
+                        <button class="btn btn-sm btn-primary-custom" onclick="exportPackets()"><i class="bi bi-download"></i> Export</button>
+                    </div>
+                </div>
+                <div class="card-body packet-table-container">
+                    <table class="packet-table" id="packetsTable">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Time</th>
+                                <th>Source IP</th>
+                                <th>Src Port</th>
+                                <th>Destination IP</th>
+                                <th>Dst Port</th>
+                                <th>Protocol</th>
+                                <th>Size</th>
+                                <th>Classification</th>
+                                <th>Confidence</th>
+                            </tr>
+                        </thead>
+                        <tbody id="packetsBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Analytics Tab -->
+        <div id="tab-analytics" class="tab-content">
+            <!-- Key Insights -->
+            <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                    <div class="insight-card">
+                        <h6><i class="bi bi-lightbulb"></i> Traffic Pattern Insight</h6>
+                        <p id="trafficInsight">Analyzing traffic patterns to identify anomalies...</p>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="insight-card">
+                        <h6><i class="bi bi-exclamation-circle"></i> Threat Insight</h6>
+                        <p id="threatInsight">Monitoring for potential security threats...</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-graph-up"></i> Traffic Over Time</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="chart-container">
+                                <canvas id="trafficOverTimeChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-geo-alt"></i> Top Source IPs</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="chart-container">
+                                <canvas id="topIpsChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-bar-chart"></i> Traffic by Hour</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="chart-container">
+                                <canvas id="hourlyChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-pie-chart"></i> Threat Distribution</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="chart-container">
+                                <canvas id="threatDistChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-arrow-left-right"></i> Top Destination Ports</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="chart-container">
+                                <canvas id="topPortsChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-shield"></i> MITRE ATT&CK Coverage</h5>
+                        </div>
+                        <div class="card-body" id="mitreCoverage">
+                            <p style="color: var(--text-secondary);">Start capture to analyze MITRE ATT&CK tactics.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Alerts Tab -->
+        <div id="tab-alerts" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="bi bi-bell"></i> Alert History</h5>
+                    <div class="d-flex gap-2">
+                        <select class="form-select" id="alertFilter" style="width: 150px; color: var(--text-primary);">
+                            <option value="">All Severities</option>
+                            <option value="CRITICAL">Critical</option>
+                            <option value="HIGH">High</option>
+                            <option value="MEDIUM">Medium</option>
+                            <option value="LOW">Low</option>
+                        </select>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="exportAlerts()" style="color: var(--text-secondary); border-color: var(--border-color);">Export</button>
+                        <button class="btn btn-sm" onclick="clearAllAlerts()" style="background: var(--accent-red); color: white; border: none;">Clear All</button>
+                    </div>
+                </div>
+                <div class="card-body" id="allAlertsBox">
+                    <p style="color: var(--text-secondary);"><i class="bi bi-inbox"></i> No alerts recorded.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Reports Tab -->
+        <div id="tab-reports" class="tab-content">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-file-earmark-pdf"></i> Generate Report</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label class="form-label">Report Type</label>
+                                <select class="form-select" id="reportType">
+                                    <option value="executive">Executive Summary</option>
+                                    <option value="detailed">Detailed Analysis</option>
+                                    <option value="threats">Threat Report</option>
+                                    <option value="incident">Incident Report</option>
+                                    <option value="full">Full Security Report</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Format</label>
+                                <select class="form-select" id="reportFormat">
+                                    <option value="html">HTML</option>
+                                    <option value="json">JSON</option>
+                                    <option value="csv">CSV</option>
+                                </select>
+                            </div>
+                            <button class="btn btn-primary-custom w-100" onclick="generateReport()">
+                                <i class="bi bi-file-earmark-arrow-down"></i> Generate Report
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- IOC Summary -->
+                    <div class="card mt-3">
+                        <div class="card-header">
+                            <h5><i class="bi bi-exclamation-triangle"></i> Indicators of Compromise</h5>
+                        </div>
+                        <div class="card-body" id="iocSummary">
+                            <p style="color: var(--text-secondary);">No IOCs detected in current session.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-8">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-file-text"></i> Report Preview</h5>
+                        </div>
+                        <div class="card-body" id="reportPreview">
+                            <p style="color: var(--text-secondary);">Generate a report to see preview here.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Tab -->
+        <div id="tab-settings" class="tab-content">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-gear"></i> Capture Settings</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label class="form-label">Network Interface</label>
+                                <select class="form-select" id="interfaceSelect">
+                                    <option value="auto">Auto-detect</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">BPF Filter</label>
+                                <input type="text" class="form-control" id="bpfFilter" placeholder="e.g., tcp port 80">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Capture Window</label>
+                                <select class="form-select" id="captureWindow">
+                                    <option value="30">30 seconds</option>
+                                    <option value="60" selected>1 minute</option>
+                                    <option value="300">5 minutes</option>
+                                    <option value="600">10 minutes</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-shield"></i> Alert Settings</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label class="form-label">Confidence Threshold</label>
+                                <input type="range" class="form-range" min="0" max="100" value="80" id="confidenceThreshold">
+                                <div class="d-flex justify-content-between">
+                                    <small style="color: var(--text-secondary);">0%</small>
+                                    <span id="thresholdValue" style="color: var(--accent-blue);">80%</span>
+                                    <small style="color: var(--text-secondary);">100%</small>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Alert Severity Filter</label>
+                                <select class="form-select" id="severityFilter">
+                                    <option value="LOW">Low and above</option>
+                                    <option value="MEDIUM" selected>Medium and above</option>
+                                    <option value="HIGH">High only</option>
+                                    <option value="CRITICAL">Critical only</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Threat Detection Sensitivity</label>
+                                <select class="form-select" id="sensitivitySelect">
+                                    <option value="low">Low (Fewer false positives)</option>
+                                    <option value="medium" selected>Medium (Balanced)</option>
+                                    <option value="high">High (More sensitive)</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-upload"></i> Import Traffic Data</h5>
+                        </div>
+                        <div class="card-body">
+                            <p style="color: var(--text-secondary); margin-bottom: 15px;">
+                                Import packet captures (JSON, CSV, or PCAP) for offline analysis.
+                            </p>
+                            <label class="btn btn-primary-custom w-100" style="cursor: pointer;">
+                                <i class="bi bi-folder-open"></i> Select File to Import
+                                <input type="file" id="importFileSettingsPage" accept=".json,.csv,.pcap" style="display: none;" onchange="importPackets(this.files[0])">
+                            </label>
+                            <small style="color: var(--text-secondary); display: block; margin-top: 10px;">
+                                Supported formats: JSON, CSV, PCAP (up to 1000 packets)
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Global State
+        let socket;
+        let isCapturing = false;
+        let packetCount = 0;
+        let sessionStart = null;
+        let allPackets = [];
+        let allAlerts = [];
+        let attackCounts = { 'BENIGN': 0, 'Bot': 0, 'Brute Force': 0, 'DoS': 0, 'Port Scan': 0, 'SQL Injection': 0, 'XSS': 0 };
+        let trafficHistory = { labels: [], pps: [], bps: [], packets: [] };
+        let iocs = { ips: [], ports: [], signatures: [] };
+        let mitreTactics = {};
+        let maliciousPackets = []; // Track packets with threats
+
+        // Charts
+        let trafficChart, protocolChart, attackChart, trafficOverTimeChart, topIpsChart, hourlyChart, threatDistChart, topPortsChart;
+
+        // Polling
+        let pollInterval;
+        let sessionId = Date.now();
+
+        // MITRE ATT&CK Mapping
+        const MITRE_MAPPING = {
+            'DoS': { tactic: 'TA0040', tacticName: 'Impact', technique: 'T1499', techniqueName: 'Endpoint DoS' },
+            'Port Scan': { tactic: 'TA0007', tacticName: 'Discovery', technique: 'T1046', techniqueName: 'Network Service Scanning' },
+            'Brute Force': { tactic: 'TA0006', tacticName: 'Credential Access', technique: 'T1110', techniqueName: 'Brute Force' },
+            'Bot': { tactic: 'TA0002', tacticName: 'Execution', technique: 'T1105', techniqueName: 'Ingress Tool Transfer' },
+            'SQL Injection': { tactic: 'TA0011', tacticName: 'Initial Access', technique: 'T1190', techniqueName: 'Exploit Public-Facing Application' },
+            'XSS': { tactic: 'TA0011', tacticName: 'Initial Access', technique: 'T1190', techniqueName: 'Exploit Public-Facing Application' }
+        };
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('Netwatcher Dashboard initializing...');
+
+            // Clean up any lingering modal backdrops from previous sessions
+            document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+            document.body.classList.remove('modal-open');
+            document.body.style.removeProperty('overflow');
+            document.body.style.removeProperty('padding-right');
+
+            // Show JS version badge to confirm JS is running
+            const versionBadge = document.getElementById('jsVersion');
+            if (versionBadge) versionBadge.style.display = 'block';
+
+            initCharts();
+            loadInterfaces();
+            fetchInitialData();
+            startPolling();
+
+            // Threshold slider
+            document.getElementById('confidenceThreshold').addEventListener('input', (e) => {
+                document.getElementById('thresholdValue').textContent = e.target.value + '%';
+            });
+
+            // Filters
+            document.getElementById('packetFilter').addEventListener('input', filterPackets);
+            document.getElementById('protocolFilter').addEventListener('change', filterPackets);
+            document.getElementById('threatFilter').addEventListener('change', filterPackets);
+            document.getElementById('alertFilter').addEventListener('change', filterAlerts);
+
+            console.log('Netwatcher Dashboard initialized');
+        });
+
+        // Start polling
+        function startPolling() {
+            if (pollInterval) clearInterval(pollInterval);
+            pollInterval = setInterval(async () => {
+                try {
+                    const statusRes = await fetch('/api/status');
+                    const status = await statusRes.json();
+                    updateDashboard(status);
+
+                    if (status.is_capturing) {
+                        const packetsRes = await fetch('/api/traffic/packets?count=500');
+                        const packets = await packetsRes.json();
+                        syncPackets(packets);
+                    }
+
+                    const alertsRes = await fetch('/api/alerts?limit=100');
+                    const alerts = await alertsRes.json();
+                    syncAlerts(alerts);
+
+                    isCapturing = status.is_capturing;
+                    updateCaptureButton();
+                } catch (e) {
+                    console.error('Polling error:', e);
+                }
+            }, 1500);
+        }
+
+        // Session Storage
+        const SESSION_KEY = 'netwatcher_sessions';
+        let currentSessionData = null;
+
+        function getSessions() {
+            const data = localStorage.getItem(SESSION_KEY);
+            return data ? JSON.parse(data) : [];
+        }
+
+        function saveSessions(sessions) {
+            localStorage.setItem(SESSION_KEY, JSON.stringify(sessions));
+        }
+
+        function saveCurrentSession(name) {
+            const sessions = getSessions();
+            const session = {
+                id: Date.now(),
+                name: name || `Session ${new Date().toLocaleString()}`,
+                timestamp: new Date().toISOString(),
+                packets: allPackets.slice(-500), // Save last 500 packets
+                alerts: allAlerts.slice(-100),   // Save last 100 alerts
+                stats: {
+                    totalPackets: packetCount,
+                    attackCounts: {...attackCounts},
+                    iocs: {...iocs},
+                    duration: sessionStart ? (Date.now() - sessionStart.getTime()) : 0
+                }
+            };
+            sessions.unshift(session); // Add to beginning
+            if (sessions.length > 50) sessions.pop(); // Keep max 50 sessions
+            saveSessions(sessions);
+            return session;
+        }
+
+        function loadSession(sessionId) {
+            const sessions = getSessions();
+            const session = sessions.find(s => s.id === sessionId);
+            if (!session) return null;
+
+            // Stop current capture if running
+            if (isCapturing) {
+                toggleCapture();
+            }
+
+            // Restore session data
+            allPackets = session.packets || [];
+            allAlerts = session.alerts || [];
+            packetCount = session.stats?.totalPackets || 0;
+            attackCounts = session.stats?.attackCounts || {...attackCounts};
+            iocs = session.stats?.iocs || { ips: [], ports: [], signatures: [] };
+
+            // Clear current data
+            trafficHistory = { labels: [], pps: [], bps: [], packets: [] };
+
+            // Update UI
+            updatePacketsTable();
+            updateAlertsTab();
+            updateIOCDisplay();
+            resetCharts();
+
+            showNotification(`Loaded session: ${session.name}`, 'success');
+            return session;
+        }
+
+        function deleteSession(sessionId) {
+            let sessions = getSessions();
+            sessions = sessions.filter(s => s.id !== sessionId);
+            saveSessions(sessions);
+            showSessionsModal();
+        }
+
+        function showSessionsModal() {
+            const sessions = getSessions();
+            let html = `
+                <div class="modal fade" id="sessionsModal" tabindex="-1">
+                    <div class="modal-dialog modal-lg">
+                        <div class="modal-content" style="background: var(--bg-card); color: var(--text-primary);">
+                            <div class="modal-header">
+                                <h5 class="modal-title"><i class="bi bi-folder-check"></i> Saved Sessions</h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body" style="max-height: 400px; overflow-y: auto;">
+                                <div class="d-flex justify-content-between mb-3">
+                                    <button class="btn btn-primary-custom" onclick="document.getElementById('sessionsModal').querySelector('.btn-close').click(); startNewSession()">
+                                        <i class="bi bi-plus-circle"></i> New Session
+                                    </button>
+                                    <span class="text-secondary">${sessions.length} session(s)</span>
+                                </div>
+            `;
+
+            if (sessions.length === 0) {
+                html += '<p class="text-center text-secondary"><i class="bi bi-inbox" style="font-size: 3rem;"></i><br>No saved sessions yet.<br>Click "New Session" to start monitoring.</p>';
+            } else {
+                sessions.forEach(s => {
+                    const date = new Date(s.timestamp).toLocaleString();
+                    const duration = s.stats?.duration ? Math.round(s.stats.duration / 1000) + 's' : 'N/A';
+                    const threats = Object.values(s.stats?.attackCounts || {}).reduce((a, b) => a + b, 0);
+                    html += `
+                        <div class="card mb-2" style="background: var(--bg-dark); border: 1px solid var(--border-color);">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <h6 class="mb-1">${s.name}</h6>
+                                        <small class="text-secondary">${date}</small>
+                                        <div class="mt-2">
+                                            <span class="badge bg-primary me-1">${s.stats?.totalPackets || 0} packets</span>
+                                            <span class="badge bg-danger me-1">${threats} threats</span>
+                                            <span class="badge bg-secondary">${duration}</span>
+                                        </div>
+                                    </div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-success-custom" onclick="loadSession(${s.id})" title="Load session">
+                                            <i class="bi bi-folder-arrow-in"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-danger" onclick="deleteSession(${s.id})" title="Delete">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+
+            html += `
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Remove existing modal if any
+            const existing = document.getElementById('sessionsModal');
+            if (existing) existing.remove();
+
+            document.body.insertAdjacentHTML('beforeend', html);
+            const modal = new bootstrap.Modal(document.getElementById('sessionsModal'));
+            modal.show();
+            document.getElementById('sessionsModal').addEventListener('hidden.bs.modal', () => {
+                document.getElementById('sessionsModal')?.remove();
+                // Remove any lingering modal backdrops
+                document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+                document.body.classList.remove('modal-open');
+                document.body.style.removeProperty('overflow');
+                document.body.style.removeProperty('padding-right');
+            });
+        }
+
+        // Clear all dashboard UI to default state
+        function clearDashboardUI() {
+            document.getElementById('statPackets').textContent = '0';
+            document.getElementById('statPps').textContent = '0';
+            document.getElementById('statBytes').textContent = '0 B';
+            document.getElementById('statBps').textContent = '0 B/s';
+            document.getElementById('statSrcIps').textContent = '0';
+            document.getElementById('statDstIps').textContent = '0';
+            document.getElementById('statThreats').textContent = '0';
+            document.getElementById('statAlerts').textContent = '0';
+            document.getElementById('lastThreat').textContent = 'None';
+            document.getElementById('summaryConfidence').textContent = '-';
+            document.getElementById('summarySeverity').textContent = '-';
+            document.getElementById('summaryCategory').textContent = 'None';
+            document.getElementById('situationSummary').textContent = 'Ready to monitor. Click Start Capture to begin analysis.';
+            document.getElementById('threatInsight').textContent = 'Monitoring for potential security threats...';
+            document.getElementById('trafficInsight').textContent = 'Analyzing traffic patterns to identify anomalies...';
+            document.getElementById('aiAnalysisBox').innerHTML = '<p style="color: var(--text-secondary);"><i class="bi bi-info-circle"></i> Start capture to analyze traffic patterns.</p>';
+            document.getElementById('aiProvider').textContent = 'Template';
+            document.getElementById('threatIcon').innerHTML = '<i class="bi bi-shield-check" style="color: #10b981;"></i>';
+            document.getElementById('threatText').textContent = 'Network Secure';
+            document.getElementById('threatText').style.color = '#10b981';
+            document.getElementById('threatProgress').style.width = '0%';
+            document.getElementById('securityPosture').textContent = 'MONITORING';
+            document.getElementById('securityPosture').style.color = '#3b82f6';
+            document.getElementById('activeThreats').textContent = '0';
+            document.getElementById('activeThreats').style.color = '#f9fafb';
+            document.getElementById('mitreCoverage').innerHTML = '<p style="color: var(--text-secondary);">Start capture to analyze MITRE ATT&CK tactics.</p>';
+            document.getElementById('iocSummary').innerHTML = '<p style="color: var(--text-secondary);">No IOCs detected in current session.</p>';
+            resetCharts();
+        }
+
+        // Start new session
+        async function startNewSession() {
+            // If there's data, ask to save first
+            if (packetCount > 0 || allAlerts.length > 0) {
+                const save = confirm('You have unsaved data in the current session.\n\nClick OK to save, or Cancel to discard.');
+                if (save) {
+                    const name = prompt('Enter a name for this session:', `Session ${new Date().toLocaleString()}`);
+                    if (name) {
+                        saveCurrentSession(name);
+                        showNotification('Session saved successfully', 'success');
+                    }
+                }
+            }
+
+            // Stop capture if running
+            if (isCapturing) {
+                fetch('/api/capture/stop', { method: 'POST' });
+                isCapturing = false;
+            }
+
+            // Reset backend state by calling reset API (synchronous)
+            await fetch('/api/session/reset', { method: 'POST' });
+
+            // Reset all data
+            sessionId = Date.now();
+            sessionStart = null;
+            allPackets = [];
+            allAlerts = [];
+            packetCount = 0;
+            attackCounts = { 'BENIGN': 0, 'Bot': 0, 'Brute Force': 0, 'DoS': 0, 'Port Scan': 0, 'SQL Injection': 0, 'XSS': 0 };
+            trafficHistory = { labels: [], pps: [], bps: [], packets: [] };
+            iocs = { ips: [], ports: [], signatures: [] };
+            mitreTactics = {};
+            maliciousPackets = [];
+            currentClassification = null;
+            currentExplanation = null;
+
+            // Reset charts
+            resetCharts();
+
+            // Clear all UI to default state
+            clearDashboardUI();
+
+            // Clear packet tables and alerts box specifically
+            document.getElementById('packetsBody').innerHTML = '';
+            document.getElementById('recentPacketsBody').innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-secondary);">No packets captured yet</td></tr>';
+            document.getElementById('allAlertsBox').innerHTML = '<p style="color: var(--text-secondary);"><i class="bi bi-inbox"></i> No alerts recorded.</p>';
+            document.getElementById('alertsBox').innerHTML = '<p style="color: var(--text-secondary);"><i class="bi bi-bell-slash"></i> No alerts triggered yet.</p>';
+            document.getElementById('sessionDuration').textContent = '0:00';
+            document.getElementById('maliciousCount').textContent = '0';
+
+            updateCaptureButton();
+
+            showNotification('New session started. Ready to capture.', 'info');
+        }
+
+        // Reset charts
+        function resetCharts() {
+            if (trafficChart) {
+                trafficChart.data.labels = [];
+                trafficChart.data.datasets[0].data = [];
+                trafficChart.data.datasets[1].data = [];
+                trafficChart.update();
+            }
+            if (protocolChart) {
+                protocolChart.data.datasets[0].data = [1, 0, 0, 0];
+                protocolChart.update();
+            }
+            if (attackChart) {
+                attackChart.data.datasets[0].data = [1, 0, 0, 0, 0, 0, 0];
+                attackChart.update();
+            }
+            if (trafficOverTimeChart) {
+                trafficOverTimeChart.data.labels = [];
+                trafficOverTimeChart.data.datasets[0].data = [];
+                trafficOverTimeChart.update();
+            }
+            if (topIpsChart) {
+                topIpsChart.data.labels = [];
+                topIpsChart.data.datasets[0].data = [];
+                topIpsChart.update();
+            }
+            if (hourlyChart) {
+                hourlyChart.data.datasets[0].data = new Array(24).fill(0);
+                hourlyChart.update();
+            }
+            if (threatDistChart) {
+                threatDistChart.data.datasets[0].data = [100, 0];
+                threatDistChart.update();
+            }
+            if (topPortsChart) {
+                topPortsChart.data.labels = [];
+                topPortsChart.data.datasets[0].data = [];
+                topPortsChart.update();
+            }
+        }
+
+        // Update capture button
+        function updateCaptureButton() {
+            const btn = document.getElementById('captureBtn');
+            const statusBadge = document.getElementById('statusBadge');
+            const statusText = document.getElementById('statusText');
+
+            btn.disabled = false; // Always enable button
+
+            if (isCapturing) {
+                btn.innerHTML = '<i class="bi bi-stop-fill"></i> Stop Capture';
+                btn.classList.remove('btn-primary-custom');
+                btn.classList.add('btn-danger-custom');
+                statusBadge.classList.remove('inactive');
+                statusBadge.classList.add('active');
+                statusText.textContent = 'Active';
+                if (!sessionStart) {
+                    sessionStart = new Date();
+                    updateSessionTimer();
+                }
+            } else {
+                btn.innerHTML = '<i class="bi bi-play-fill"></i> Start Capture';
+                btn.classList.add('btn-primary-custom');
+                btn.classList.remove('btn-danger-custom');
+                statusBadge.classList.add('inactive');
+                statusBadge.classList.remove('active');
+                statusText.textContent = 'Inactive';
+            }
+        }
+
+        // Tab Navigation
+        function showTab(tabId) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+                tab.style.display = 'none';
+            });
+
+            // Remove active from all sidebar links
+            document.querySelectorAll('.sidebar-nav a').forEach(link => {
+                link.classList.remove('active');
+            });
+
+            // Show selected tab
+            const targetTab = document.getElementById('tab-' + tabId);
+            if (targetTab) {
+                targetTab.classList.add('active');
+                targetTab.style.display = 'block';
+            }
+
+            // Find and activate the sidebar link by data attribute
+            document.querySelectorAll('.sidebar-nav li').forEach(li => {
+                const link = li.querySelector('a');
+                if (link && link.getAttribute('data-tab') === tabId) {
+                    link.classList.add('active');
+                }
+            });
+
+            // Update page title
+            const pageTitle = document.getElementById('pageTitle');
+            if (pageTitle) {
+                pageTitle.textContent = tabId.charAt(0).toUpperCase() + tabId.slice(1);
+            }
+
+            console.log('Switched to tab:', tabId);
+        }
+
+        // Toggle Capture
+        async function toggleCapture() {
+            console.log('Toggle capture clicked, current state:', isCapturing);
+            const btn = document.getElementById('captureBtn');
+            if (!btn) {
+                console.error('Capture button not found!');
+                return;
+            }
+
+            try {
+                if (!isCapturing) {
+                    const iface = document.getElementById('interfaceSelect')?.value || 'auto';
+                    const filter = document.getElementById('bpfFilter')?.value || '';
+
+                    console.log('Starting capture with interface:', iface, 'filter:', filter);
+                    btn.disabled = true;
+                    btn.innerHTML = '<i class="bi bi-arrow-repeat spin"></i> Starting...';
+
+                    const response = await fetch('/api/capture/start', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ interface: iface, filter })
+                    });
+
+                    const data = await response.json();
+                    console.log('Start response:', data);
+
+                    if (data.success) {
+                        isCapturing = true;
+                        sessionStart = new Date();
+                        updateCaptureButton();
+                        updateSessionTimer();
+                        showNotification('Capture started successfully', 'success');
+                    } else {
+                        btn.disabled = false;
+                        btn.innerHTML = '<i class="bi bi-play-fill"></i> Start Capture';
+                        showNotification('Failed to start capture: ' + data.message, 'danger');
+                    }
+                } else {
+                    btn.disabled = true;
+                    btn.innerHTML = '<i class="bi bi-arrow-repeat spin"></i> Stopping...';
+
+                    await fetch('/api/capture/stop', { method: 'POST' });
+                    isCapturing = false;
+                    updateCaptureButton();
+                    showNotification('Capture stopped', 'info');
+                }
+            } catch (e) {
+                console.error('Toggle capture error:', e);
+                btn.disabled = false;
+                btn.innerHTML = isCapturing ? '<i class="bi bi-stop-fill"></i> Stop Capture' : '<i class="bi bi-play-fill"></i> Start Capture';
+                showNotification('Error: ' + e.message, 'danger');
+            }
+        }
+
+        // Update Session Timer
+        function updateSessionTimer() {
+            if (!isCapturing || !sessionStart) return;
+
+            const elapsed = Math.floor((new Date() - sessionStart) / 1000);
+            const hours = Math.floor(elapsed / 3600);
+            const minutes = Math.floor((elapsed % 3600) / 60);
+            const seconds = elapsed % 60;
+
+            document.getElementById('sessionDuration').textContent =
+                hours > 0 ? `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+                : `${minutes}:${String(seconds).padStart(2, '0')}`;
+
+            setTimeout(updateSessionTimer, 1000);
+        }
+
+        // Initialize Charts
+        function initCharts() {
+            const chartDefaults = {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        labels: { color: '#f9fafb' }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { color: 'rgba(255,255,255,0.05)' },
+                        ticks: { color: '#9ca3af' }
+                    },
+                    y: {
+                        grid: { color: 'rgba(255,255,255,0.05)' },
+                        ticks: { color: '#9ca3af' }
+                    }
+                }
+            };
+
+            // Traffic Chart
+            const trafficCtx = document.getElementById('trafficChart').getContext('2d');
+            trafficChart = new Chart(trafficCtx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [
+                        { label: 'Packets/sec', data: [], borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.1)', fill: true, tension: 0.4, borderWidth: 2 },
+                        { label: 'KB/sec', data: [], borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.1)', fill: true, tension: 0.4, borderWidth: 2, yAxisID: 'y1' }
+                    ]
+                },
+                options: {
+                    ...chartDefaults,
+                    scales: {
+                        ...chartDefaults.scales,
+                        y1: { position: 'right', grid: { display: false }, ticks: { color: '#9ca3af' } }
+                    }
+                }
+            });
+
+            // Protocol Chart
+            const protocolCtx = document.getElementById('protocolChart').getContext('2d');
+            protocolChart = new Chart(protocolCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['TCP', 'UDP', 'ICMP', 'Other'],
+                    datasets: [{ data: [1, 0, 0, 0], backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#9ca3af'], borderWidth: 0 }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#f9fafb' } } } }
+            });
+
+            // Attack Chart
+            const attackCtx = document.getElementById('attackChart').getContext('2d');
+            attackChart = new Chart(attackCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['Normal', 'DoS', 'Port Scan', 'Brute Force', 'Bot', 'SQL Inj', 'XSS'],
+                    datasets: [{ data: [1, 0, 0, 0, 0, 0, 0], backgroundColor: ['#10b981', '#ef4444', '#f97316', '#f59e0b', '#8b5cf6', '#06b6d4', '#ec4899'], borderRadius: 4 }]
+                },
+                options: { ...chartDefaults, plugins: { legend: { display: false } } }
+            });
+
+            // Traffic Over Time
+            const totCtx = document.getElementById('trafficOverTimeChart').getContext('2d');
+            trafficOverTimeChart = new Chart(totCtx, {
+                type: 'line',
+                data: { labels: [], datasets: [{ label: 'Packets', data: [], borderColor: '#3b82f6', fill: true, tension: 0.4 }] },
+                options: chartDefaults
+            });
+
+            // Top IPs
+            const ipsCtx = document.getElementById('topIpsChart').getContext('2d');
+            topIpsChart = new Chart(ipsCtx, {
+                type: 'bar',
+                data: { labels: [], datasets: [{ label: 'Packets', data: [], backgroundColor: '#3b82f6', borderRadius: 4 }] },
+                options: { ...chartDefaults, indexAxis: 'y' }
+            });
+
+            // Hourly
+            const hourlyCtx = document.getElementById('hourlyChart').getContext('2d');
+            hourlyChart = new Chart(hourlyCtx, {
+                type: 'bar',
+                data: { labels: Array.from({length: 24}, (_, i) => `${i}:00`), datasets: [{ label: 'Traffic', data: new Array(24).fill(0), backgroundColor: '#8b5cf6', borderRadius: 4 }] },
+                options: chartDefaults
+            });
+
+            // Threat Distribution
+            const threatCtx = document.getElementById('threatDistChart').getContext('2d');
+            threatDistChart = new Chart(threatCtx, {
+                type: 'doughnut',
+                data: { labels: ['Normal', 'Threats'], datasets: [{ data: [100, 0], backgroundColor: ['#10b981', '#ef4444'], borderWidth: 0 }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#f9fafb' } } } }
+            });
+
+            // Top Ports
+            const portsCtx = document.getElementById('topPortsChart').getContext('2d');
+            topPortsChart = new Chart(portsCtx, {
+                type: 'bar',
+                data: { labels: [], datasets: [{ label: 'Connections', data: [], backgroundColor: '#f97316', borderRadius: 4 }] },
+                options: chartDefaults
+            });
+        }
+
+        // Load Interfaces
+        function loadInterfaces() {
+            fetch('/api/interfaces')
+                .then(r => r.json())
+                .then(interfaces => {
+                    const select = document.getElementById('interfaceSelect');
+                    interfaces.forEach(iface => {
+                        const option = document.createElement('option');
+                        option.value = iface.name;
+                        option.textContent = `${iface.name} (${iface.description || 'No description'})`;
+                        select.appendChild(option);
+                    });
+                });
+        }
+
+        // Fetch Initial Data
+        function fetchInitialData() {
+            fetch('/api/status')
+                .then(r => r.json())
+                .then(data => updateDashboard(data));
+
+            fetch('/api/alerts')
+                .then(r => r.json())
+                .then(alerts => {
+                    allAlerts = alerts;
+                    updateAlertsTab();
+                });
+        }
+
+        // Update Dashboard
+        function updateDashboard(data) {
+            // If no data or empty stats, show default state
+            const hasStats = data.stats && Object.keys(data.stats).length > 0;
+            const hasClassification = data.classification && Object.keys(data.classification).length > 0;
+            const hasExplanation = data.explanation && Object.keys(data.explanation).length > 0;
+
+            // If everything is empty (after reset), clear all UI
+            if (!hasStats && !hasClassification && !hasExplanation) {
+                clearDashboardUI();
+                return;
+            }
+
+            const stats = data.stats || {};
+
+            if (hasStats) {
+                document.getElementById('statPackets').textContent = formatNumber(stats.total_packets || 0);
+                document.getElementById('statPps').textContent = formatNumber((stats.packets_per_second || 0).toFixed(1));
+                document.getElementById('statBytes').textContent = formatBytes(stats.total_bytes || 0);
+                document.getElementById('statBps').textContent = formatBytes(stats.bytes_per_second || 0) + '/s';
+                document.getElementById('statSrcIps').textContent = formatNumber(stats.unique_src_ips || 0);
+                document.getElementById('statDstIps').textContent = formatNumber(stats.unique_dst_ips || 0);
+
+                // Update threat counts from stats
+                const threatFromStats = getThreatCountFromStats(stats);
+                document.getElementById('statThreats').textContent = threatFromStats;
+
+                updateTrafficChart(stats);
+                updateProtocolChart(stats.protocol_distribution);
+                updateTopPorts(stats.top_dst_ports || {}, currentClassification);
+                updateTopIps(stats.top_src_ips || {});
+                updateTopPortsChart(stats.top_dst_ports || {});
+                updateTrafficInsight(stats);
+                updateAnalyticsCharts(stats);
+            }
+
+            if (hasClassification) {
+                // Store real ML classification for threat tracking
+                currentClassification = data.classification;
+                updateClassification(data.classification, stats);
+            }
+
+            if (hasExplanation) {
+                updateAIAnalysis(data.explanation);
+            }
+
+            if (data.alert_stats) {
+                document.getElementById('statAlerts').textContent = data.alert_stats.total_alerts || 0;
+                document.getElementById('criticalCount').textContent = data.alert_stats.by_severity?.CRITICAL || 0;
+            }
+
+            document.getElementById('summaryTime').textContent = 'Last updated: ' + new Date().toLocaleTimeString();
+        }
+
+        // Helper to count threats from stats
+        function getThreatCountFromStats(stats) {
+            let count = 0;
+            if ((stats.xss_count || 0) >= 5) count++;
+            if ((stats.sql_injection_count || 0) >= 5) count++;
+            if ((stats.brute_force_count || 0) >= 10) count++;
+            if ((stats.dos_packets || 0) >= 20) count++;
+            if ((stats.port_scan_sources && Object.keys(stats.port_scan_sources).length > 0)) count++;
+            if ((stats.bot_beacon_score || 0) >= 3) count++;
+            return count;
+        }
+
+        // Update Traffic Chart
+        function updateTrafficChart(stats) {
+            const now = new Date().toLocaleTimeString();
+            const pps = stats.packets_per_second || 0;
+            const bps = (stats.bytes_per_second || 0) / 1024;
+
+            trafficHistory.labels.push(now);
+            trafficHistory.pps.push(pps);
+            trafficHistory.bps.push(bps);
+
+            if (trafficHistory.labels.length > 60) {
+                trafficHistory.labels.shift();
+                trafficHistory.pps.shift();
+                trafficHistory.bps.shift();
+            }
+
+            trafficChart.data.labels = trafficHistory.labels;
+            trafficChart.data.datasets[0].data = trafficHistory.pps;
+            trafficChart.data.datasets[1].data = trafficHistory.bps;
+            trafficChart.update();
+
+            document.getElementById('trafficStatus').textContent = `Live - ${trafficHistory.labels.length} data points`;
+        }
+
+        // Update Protocol Chart
+        function updateProtocolChart(dist) {
+            const total = (dist.TCP || 0) + (dist.UDP || 0) + (dist.ICMP || 0);
+            const other = Math.max(0, (dist.total_packets || 0) - total);
+
+            protocolChart.data.datasets[0].data = [
+                dist.TCP || 0,
+                dist.UDP || 0,
+                dist.ICMP || 0,
+                other
+            ];
+            protocolChart.update();
+        }
+
+        // Update Classification
+        function updateClassification(cls, stats = {}) {
+            const isThreat = cls.is_threat === true || cls.is_threat === 'true';
+            const label = cls.label || 'BENIGN';
+            const category = cls.category || 'Normal';
+            const confidence = cls.confidence || 0;
+            const severity = cls.severity || 0;
+
+            // Get all detected attacks
+            const allAttacks = cls.all_detected_attacks || [];
+            const hasMultipleAttacks = allAttacks.length > 1;
+            const threatCount = allAttacks.length || (isThreat ? 1 : 0);
+
+            // Only count as threat if confidence > 0.85 (high threshold to reduce false positives)
+            const isRealThreat = (isThreat && confidence > 0.85) || allAttacks.length > 0;
+
+            // Update attack counts for all detected attacks
+            if (isRealThreat && allAttacks.length > 0) {
+                allAttacks.forEach(attack => {
+                    attackCounts[attack] = (attackCounts[attack] || 0) + 1;
+                });
+            } else if (!isRealThreat) {
+                attackCounts['BENIGN'] = (attackCounts['BENIGN'] || 0) + 1;
+            }
+
+            document.getElementById('statThreats').textContent = threatCount;
+            document.getElementById('lastThreat').textContent = isRealThreat ? label : 'None';
+
+            document.getElementById('summaryConfidence').textContent = (confidence * 100).toFixed(0) + '%';
+            document.getElementById('summarySeverity').textContent = severity > 0 ? getSeverityLabel(severity) : '-';
+            document.getElementById('summaryCategory').textContent = category.substring(0, 10);
+
+            // Update threat level
+            const threatIcon = document.getElementById('threatIcon');
+            const threatText = document.getElementById('threatText');
+            const threatProgress = document.getElementById('threatProgress');
+
+            if (isRealThreat) {
+                const level = cls.threat_level || (hasMultipleAttacks ? 'critical' : 'high');
+                let icon, bgColor;
+                if (level === 'critical' || hasMultipleAttacks) {
+                    icon = '<i class="bi bi-x-octagon-fill" style="color: #ef4444;"></i>';
+                    bgColor = '#ef4444';
+                } else if (level === 'high') {
+                    icon = '<i class="bi bi-exclamation-triangle-fill" style="color: #f97316;"></i>';
+                    bgColor = '#f97316';
+                } else {
+                    icon = '<i class="bi bi-exclamation-circle-fill" style="color: #f59e0b;"></i>';
+                    bgColor = '#f59e0b';
+                }
+                threatIcon.innerHTML = icon;
+                // Show primary attack and count of others
+                const attackText = hasMultipleAttacks ?
+                    `${label} (+${allAttacks.length - 1} more)` :
+                    label;
+                threatText.textContent = attackText;
+                threatText.style.color = bgColor;
+                threatProgress.style.width = (confidence * 100) + '%';
+                threatProgress.style.background = bgColor;
+
+                // Update security posture
+                document.getElementById('securityPosture').textContent = hasMultipleAttacks ? 'MULTIPLE THREATS' : 'THREAT DETECTED';
+                document.getElementById('securityPosture').style.color = '#ef4444';
+                document.getElementById('activeThreats').textContent = threatCount.toString();
+                document.getElementById('activeThreats').style.color = '#ef4444';
+
+                // Update threat insight - show all attacks
+                const mitre = MITRE_MAPPING[label] || {};
+                let insight = '';
+                if (hasMultipleAttacks) {
+                    insight = `${allAttacks.length} attacks detected: ${allAttacks.join(', ')}. MITRE: ${mitre.tacticName || 'Unknown'}`;
+                } else {
+                    insight = `${label} attack detected with ${(confidence * 100).toFixed(0)}% confidence. MITRE: ${mitre.tacticName || 'Unknown'} - ${mitre.techniqueName || 'Unknown'}`;
+                }
+                document.getElementById('threatInsight').textContent = insight;
+
+                // Update MITRE coverage for ALL attacks
+                allAttacks.forEach(attack => updateMITRECoverage(attack));
+            } else {
+                threatIcon.innerHTML = '<i class="bi bi-shield-check" style="color: #10b981;"></i>';
+                threatText.textContent = 'Network Secure';
+                threatText.style.color = '#10b981';
+                threatProgress.style.width = '0%';
+                threatProgress.style.background = '#10b981';
+
+                document.getElementById('securityPosture').textContent = 'SECURE';
+                document.getElementById('securityPosture').style.color = '#10b981';
+                document.getElementById('activeThreats').textContent = '0';
+                document.getElementById('activeThreats').style.color = '#f9fafb';
+            }
+
+            // Update situation summary
+            updateSituationSummary(cls, stats);
+        }
+
+        // Update Situation Summary
+        function updateSituationSummary(cls, stats) {
+            const totalPackets = stats.total_packets || 0;
+            const uniqueSrc = stats.unique_src_ips || 0;
+            const uniqueDst = stats.unique_dst_ips || 0;
+            const isThreat = cls.is_threat && cls.confidence > 0.7;
+
+            let summary = '';
+            if (totalPackets === 0) {
+                summary = 'No traffic detected. Start capture to monitor network traffic.';
+            } else if (isThreat) {
+                summary = `ALERT: ${cls.label} attack detected with ${(cls.confidence * 100).toFixed(0)}% confidence. ${totalPackets} packets analyzed from ${uniqueSrc} sources targeting ${uniqueDst} destinations. Immediate investigation recommended.`;
+            } else if (totalPackets > 1000) {
+                summary = `Monitoring ${totalPackets} packets from ${uniqueSrc} unique source IPs targeting ${uniqueDst} destinations. Traffic patterns appear normal.`;
+            } else {
+                summary = `Analyzing ${totalPackets} packets. ${uniqueSrc} sources communicating with ${uniqueDst} destinations. No threats detected.`;
+            }
+
+            document.getElementById('situationSummary').textContent = summary;
+        }
+
+        // Update Traffic Insight
+        function updateTrafficInsight(stats) {
+            const pps = stats.packets_per_second || 0;
+            const avgSize = stats.avg_packet_size || 0;
+            const tcpRatio = (stats.protocol_distribution?.TCP || 0) / Math.max(stats.total_packets || 1);
+            const udpRatio = (stats.protocol_distribution?.UDP || 0) / Math.max(stats.total_packets || 1);
+
+            let insight = '';
+            if (pps > 100) {
+                insight = `High traffic volume detected: ${pps.toFixed(1)} packets/sec. Average packet size: ${avgSize.toFixed(0)} bytes.`;
+            } else if (pps > 10) {
+                insight = `Moderate traffic: ${pps.toFixed(1)} packets/sec. TCP: ${(tcpRatio * 100).toFixed(0)}%, UDP: ${(udpRatio * 100).toFixed(0)}%.`;
+            } else if (pps > 0) {
+                insight = `Low traffic activity: ${pps.toFixed(1)} packets/sec. Normal baseline traffic detected.`;
+            } else {
+                insight = 'No traffic detected in the current window.';
+            }
+
+            document.getElementById('trafficInsight').textContent = insight;
+        }
+
+        // Update MITRE Coverage
+        function updateMITRECoverage(label) {
+            const mitre = MITRE_MAPPING[label];
+            if (!mitre) return;
+
+            mitreTactics[mitre.tactic] = mitreTactics[mitre.tactic] || { count: 0, techniques: {} };
+            mitreTactics[mitre.tactic].count++;
+            mitreTactics[mitre.tactic].techniques[mitre.technique] = (mitreTactics[mitre.tactic].techniques[mitre.technique] || 0) + 1;
+
+            let html = '<div class="row">';
+            for (const [tactic, data] of Object.entries(mitreTactics)) {
+                const tacticName = MITRE_MAPPING[Object.keys(MITRE_MAPPING).find(k => MITRE_MAPPING[k].tactic === tactic)]?.tacticName || tactic;
+                html += `<div class="col-md-6 mb-2">
+                    <div class="summary-box">
+                        <h6><span class="mitre-badge">${tactic}</span> ${tacticName}</h6>
+                        <small style="color: var(--text-secondary);">Detections: ${data.count}</small>
+                    </div>
+                </div>`;
+            }
+            html += '</div>';
+            document.getElementById('mitreCoverage').innerHTML = html || '<p style="color: var(--text-secondary);">Analyzing...</p>';
+        }
+
+        // Get Severity Label
+        function getSeverityLabel(severity) {
+            if (severity >= 4) return 'CRITICAL';
+            if (severity >= 3) return 'HIGH';
+            if (severity >= 2) return 'MEDIUM';
+            if (severity >= 1) return 'LOW';
+            return 'NONE';
+        }
+
+        // Update Analytics Charts
+        function updateAnalyticsCharts(stats) {
+            // Traffic Over Time Chart
+            const now = new Date().toLocaleTimeString();
+            if (trafficOverTimeChart) {
+                trafficOverTimeChart.data.labels.push(now);
+                trafficOverTimeChart.data.datasets[0].data.push(stats.packets_per_second || 0);
+                if (trafficOverTimeChart.data.labels.length > 30) {
+                    trafficOverTimeChart.data.labels.shift();
+                    trafficOverTimeChart.data.datasets[0].data.shift();
+                }
+                trafficOverTimeChart.update();
+            }
+
+            // Update Top IPs Chart from stats
+            if (topIpsChart && stats.top_src_ips) {
+                const ips = Object.keys(stats.top_src_ips || {}).slice(0, 10);
+                const counts = ips.map(ip => stats.top_src_ips[ip] || 0);
+                topIpsChart.data.labels = ips;
+                topIpsChart.data.datasets[0].data = counts;
+                topIpsChart.update();
+            }
+
+            // Update Top Ports Chart from stats
+            if (topPortsChart && stats.top_dst_ports) {
+                const ports = Object.keys(stats.top_dst_ports || {}).slice(0, 10);
+                const counts = ports.map(p => stats.top_dst_ports[p] || 0);
+                topPortsChart.data.labels = ports;
+                topPortsChart.data.datasets[0].data = counts;
+                topPortsChart.update();
+            }
+
+            // Attack Distribution Chart - update from attack counts
+            if (attackChart) {
+                const labels = attackChart.data.labels;
+                const data = [
+                    attackCounts['BENIGN'] || 0,
+                    attackCounts['DoS'] || 0,
+                    attackCounts['Port Scan'] || 0,
+                    attackCounts['Brute Force'] || 0,
+                    attackCounts['Bot'] || 0,
+                    attackCounts['SQL Injection'] || 0,
+                    attackCounts['XSS'] || 0
+                ];
+                attackChart.data.datasets[0].data = data;
+                attackChart.update();
+            }
+
+            // Threat Distribution Chart
+            if (threatDistChart) {
+                const totalThreats = Object.values(attackCounts || {}).reduce((a, b) => a + b, 0) - (attackCounts['BENIGN'] || 0);
+                const total = (stats.total_packets || 1);
+                threatDistChart.data.datasets[0].data = [total - totalThreats, totalThreats];
+                threatDistChart.update();
+            }
+
+            // Update hourly chart with current hour data
+            if (hourlyChart) {
+                const hour = new Date().getHours();
+                if (hourlyChart.data.datasets[0].data[hour] !== undefined) {
+                    hourlyChart.data.datasets[0].data[hour] += (stats.packets_per_second || 0);
+                }
+                hourlyChart.update();
+            }
+        }
+
+        // Update AI Analysis
+        function updateAIAnalysis(exp) {
+            document.getElementById('aiProvider').textContent = exp.provider || 'Analysis';
+
+            let html = '';
+
+            if (exp.summary) {
+                html += `<p style="margin-bottom: 10px;">${exp.summary}</p>`;
+            }
+
+            if (exp.threat_analysis) {
+                html += `<div style="background: rgba(239, 68, 68, 0.1); padding: 10px; border-radius: 8px; margin-bottom: 10px;">
+                    <strong style="color: var(--accent-red);">Threat Analysis:</strong>
+                    <p style="margin: 5px 0 0 0;">${exp.threat_analysis}</p>
+                </div>`;
+            }
+
+            if (exp.recommendations && exp.recommendations.length > 0) {
+                html += `<div>
+                    <strong style="color: var(--accent-blue);">Recommended Actions:</strong>
+                    <ul style="margin: 5px 0 0 0; padding-left: 20px;">${exp.recommendations.map(r => `<li style="margin: 3px 0;">${r}</li>`).join('')}</ul>
+                </div>`;
+            }
+
+            if (html) {
+                document.getElementById('aiAnalysisBox').innerHTML = html;
+            }
+        }
+
+        // Format Number
+        function formatNumber(num) {
+            if (num === undefined || num === null) return '0';
+            num = parseFloat(num);
+            if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+            if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+            return num.toString();
+        }
+
+        // Format Bytes
+        function formatBytes(bytes) {
+            if (bytes === undefined || bytes === null || bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        }
+
+        // Sync Packets
+        function syncPackets(packets) {
+            if (!packets || !Array.isArray(packets)) return;
+
+            // Add new packets
+            packets.forEach(p => {
+                if (!allPackets.find(existing => existing.id === p.id)) {
+                    allPackets.push(p);
+                }
+            });
+
+            // Keep only last 5000
+            if (allPackets.length > 5000) {
+                allPackets = allPackets.slice(-5000);
+            }
+
+            // Update malicious count
+            maliciousPackets = allPackets.filter(p => p.is_threat);
+            document.getElementById('maliciousCount').textContent = maliciousPackets.length;
+
+            updatePacketsTable();
+            updateRecentPacketsTable();
+        }
+
+        // Update Packets Table
+        function updatePacketsTable() {
+            const tbody = document.getElementById('packetsBody');
+            if (!tbody) return;
+
+            // Apply filters
+            const filterText = (document.getElementById('packetFilter')?.value || '').toLowerCase();
+            const protocolFilter = document.getElementById('protocolFilter')?.value || '';
+            const threatFilter = document.getElementById('threatFilter')?.value || '';
+
+            let filtered = allPackets;
+            if (filterText) {
+                filtered = filtered.filter(p =>
+                    (p.src_ip || '').includes(filterText) ||
+                    (p.dst_ip || '').includes(filterText) ||
+                    (p.protocol || '').toLowerCase().includes(filterText) ||
+                    (p.classification || '').toLowerCase().includes(filterText)
+                );
+            }
+            if (protocolFilter) {
+                filtered = filtered.filter(p => p.protocol === protocolFilter);
+            }
+            if (threatFilter === 'threat') {
+                filtered = filtered.filter(p => p.is_threat);
+            } else if (threatFilter === 'normal') {
+                filtered = filtered.filter(p => !p.is_threat);
+            }
+
+            // Show only last 500
+            filtered = filtered.slice(-500);
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="10" style="text-align: center; color: var(--text-secondary);">No packets captured yet</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = filtered.map((p, idx) => {
+                const protoClass = `protocol-${p.protocol || 'OTHER'}`;
+                const threatClass = p.is_threat ? 'dangerous' : 'normal';
+                const threatLabel = p.is_threat ? (p.attack_type || 'Threat') : 'Normal';
+                const confidence = p.confidence ? (p.confidence * 100).toFixed(0) + '%' : '-';
+
+                return `<tr>
+                    <td>${p.id || idx + 1}</td>
+                    <td>${p.timestamp || '--'}</td>
+                    <td><span class="ip-badge">${p.src_ip || '--'}</span></td>
+                    <td>${p.src_port || '--'}</td>
+                    <td><span class="ip-badge">${p.dst_ip || '--'}</span></td>
+                    <td>${p.dst_port || '--'}</td>
+                    <td><span class="protocol-badge ${protoClass}">${p.protocol || 'OTHER'}</span></td>
+                    <td>${formatBytes(p.size || 0)}</td>
+                    <td><span class="threat-badge ${threatClass}">${threatLabel}</span></td>
+                    <td>${confidence}</td>
+                </tr>`;
+            }).join('');
+        }
+
+        // Update Recent Packets Table
+        function updateRecentPacketsTable() {
+            const tbody = document.getElementById('recentPacketsBody');
+            if (!tbody) return;
+
+            const recent = allPackets.slice(-10).reverse();
+
+            if (recent.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-secondary);">No packets captured yet</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = recent.map(p => {
+                const protoClass = `protocol-${p.protocol || 'OTHER'}`;
+                const threatClass = p.is_threat ? 'dangerous' : 'normal';
+                const threatLabel = p.is_threat ? (p.attack_type || 'Threat') : 'Normal';
+
+                return `<tr>
+                    <td>${p.timestamp ? p.timestamp.split('T')[1]?.substring(0, 8) : '--'}</td>
+                    <td><span class="ip-badge">${p.src_ip || '--'}</span></td>
+                    <td><span class="ip-badge">${p.dst_ip || '--'}</span></td>
+                    <td><span class="protocol-badge ${protoClass}">${p.protocol || 'OTHER'}</span></td>
+                    <td>${formatBytes(p.size || 0)}</td>
+                    <td><span class="threat-badge ${threatClass}">${threatLabel}</span></td>
+                </tr>`;
+            }).join('');
+        }
+
+        // Filter Packets
+        function filterPackets() {
+            updatePacketsTable();
+        }
+
+        // Sync Alerts
+        function syncAlerts(alerts) {
+            if (!alerts || !Array.isArray(alerts)) return;
+
+            alerts.forEach(a => {
+                if (!allAlerts.find(existing => existing.id === a.id)) {
+                    allAlerts.unshift(a);
+                }
+            });
+
+            // Keep only last 500
+            if (allAlerts.length > 500) {
+                allAlerts = allAlerts.slice(0, 500);
+            }
+
+            updateAlertsTab();
+            updateRecentAlerts();
+            updateAlertBadge();
+        }
+
+        // Update Alerts Tab
+        function updateAlertsTab() {
+            const box = document.getElementById('allAlertsBox');
+            if (!box) return;
+
+            const filter = document.getElementById('alertFilter')?.value || '';
+            let filtered = allAlerts;
+
+            if (filter) {
+                filtered = filtered.filter(a => {
+                    if (filter === 'CRITICAL') return a.severity === 'CRITICAL';
+                    if (filter === 'HIGH') return a.severity === 'CRITICAL' || a.severity === 'HIGH';
+                    if (filter === 'MEDIUM') return a.severity !== 'LOW';
+                    return true;
+                });
+            }
+
+            if (filtered.length === 0) {
+                box.innerHTML = '<p style="color: var(--text-secondary);"><i class="bi bi-inbox"></i> No alerts recorded.</p>';
+                return;
+            }
+
+            box.innerHTML = filtered.slice(0, 100).map(a => {
+                const sevClass = `severity-${a.severity || 'LOW'}`;
+                return `<div class="alert-item">
+                    <div class="alert-item-header">
+                        <span class="severity-badge ${sevClass}">${a.severity || 'LOW'}</span>
+                        <small style="color: var(--text-secondary);">${a.timestamp || ''}</small>
+                    </div>
+                    <div class="alert-item-body">
+                        <strong>${a.title || 'Alert'}</strong>
+                        <p style="margin: 5px 0 0 0;">${a.message || ''}</p>
+                        ${a.src_ip ? `<small style="color: var(--accent-blue);">Source: ${a.src_ip}:${a.src_port || '--'}</small>` : ''}
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        // Update Recent Alerts
+        function updateRecentAlerts() {
+            const box = document.getElementById('alertsBox');
+            if (!box) return;
+
+            const recent = allAlerts.slice(0, 5);
+
+            if (recent.length === 0) {
+                box.innerHTML = '<p style="color: var(--text-secondary);"><i class="bi bi-bell-slash"></i> No alerts triggered yet.</p>';
+                return;
+            }
+
+            box.innerHTML = recent.map(a => {
+                const sevClass = `severity-${a.severity || 'LOW'}`;
+                return `<div class="alert-item">
+                    <div class="alert-item-header">
+                        <span class="severity-badge ${sevClass}">${a.severity || 'LOW'}</span>
+                        <small style="color: var(--text-secondary);">${a.timestamp ? a.timestamp.split('T')[1]?.substring(0, 8) : ''}</small>
+                    </div>
+                    <div class="alert-item-body">
+                        <strong>${a.title || 'Alert'}</strong>
+                        <p style="margin: 3px 0 0 0; font-size: 0.85rem;">${a.message || ''}</p>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        // Filter Alerts
+        function filterAlerts() {
+            updateAlertsTab();
+        }
+
+        // Update Alert Badge
+        function updateAlertBadge() {
+            const badge = document.getElementById('alertBadge');
+            if (!badge) return;
+
+            const count = allAlerts.length;
+            if (count > 0) {
+                badge.textContent = count;
+                badge.style.display = 'inline';
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+
+        // Clear Alerts
+        function clearAlerts() {
+            allAlerts = [];
+            updateAlertsTab();
+            updateRecentAlerts();
+            updateAlertBadge();
+            showNotification('Recent alerts cleared', 'info');
+        }
+
+        // Clear All Alerts
+        function clearAllAlerts() {
+            if (!confirm('Clear all alerts?')) return;
+            allAlerts = [];
+            updateAlertsTab();
+            updateRecentAlerts();
+            updateAlertBadge();
+            showNotification('All alerts cleared', 'info');
+        }
+
+        // Export Alerts
+        function exportAlerts() {
+            const data = JSON.stringify(allAlerts, null, 2);
+            downloadFile(data, 'alerts.json', 'application/json');
+            showNotification('Alerts exported', 'success');
+        }
+
+        // Update Top Ports
+        function updateTopPorts(ports, classification) {
+            const tbody = document.getElementById('topPortsBody');
+            if (!tbody) return;
+
+            const entries = Object.entries(ports || {}).slice(0, 10);
+
+            if (entries.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-secondary);">No data</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = entries.map(([port, count]) => {
+                const service = getPortService(port);
+                const risk = getPortRisk(port, service);
+                const attackType = getAttackTypeForPort(port, classification);
+                return `<tr>
+                    <td><span class="ip-badge">${port}</span></td>
+                    <td>${service}</td>
+                    <td>${service.substring(0, 10)}</td>
+                    <td>${count}</td>
+                    <td><span class="threat-badge ${risk}">${risk}</span></td>
+                    <td>${attackType}</td>
+                </tr>`;
+            }).join('');
+        }
+
+        // Get Port Service
+        function getPortService(port) {
+            const services = {
+                '21': 'FTP', '22': 'SSH', '23': 'Telnet', '25': 'SMTP', '53': 'DNS',
+                '80': 'HTTP', '110': 'POP3', '143': 'IMAP', '443': 'HTTPS', '445': 'SMB',
+                '3306': 'MySQL', '3389': 'RDP', '5432': 'PostgreSQL', '6379': 'Redis',
+                '8080': 'HTTP-Alt', '8443': 'HTTPS-Alt', '27017': 'MongoDB'
+            };
+            return services[port] || 'Unknown';
+        }
+
+        // Get Port Risk
+        function getPortRisk(port, service) {
+            const highRiskPorts = ['23', '445', '3389', '23'];
+            const mediumRiskPorts = ['21', '22', '3306', '5432', '6379', '27017'];
+            if (highRiskPorts.includes(port)) return 'dangerous';
+            if (mediumRiskPorts.includes(port)) return 'suspicious';
+            return 'normal';
+        }
+
+        // Get Attack Type for Port
+        function getAttackTypeForPort(port, classification) {
+            if (!classification) return '-';
+            const label = classification.label || '';
+            if (port === '80' || port === '8080') {
+                if (label.includes('SQL')) return 'SQL Injection';
+                if (label.includes('XSS')) return 'XSS';
+            }
+            if (port === '22' || port === '23') return 'Brute Force';
+            if (label.includes('DoS')) return 'DoS';
+            if (label.includes('Port Scan')) return 'Port Scan';
+            return '-';
+        }
+
+        // Update Top IPs
+        function updateTopIps(ips) {
+            // Update IP trend
+            const ipCount = Object.keys(ips || {}).length;
+            document.getElementById('statSrcIps').textContent = formatNumber(ipCount);
+        }
+
+        // Update Top Ports Chart
+        function updateTopPortsChart(ports) {
+            if (!topPortsChart) return;
+
+            const entries = Object.entries(ports || {}).slice(0, 10);
+            topPortsChart.data.labels = entries.map(([port]) => port);
+            topPortsChart.data.datasets[0].data = entries.map(([, count]) => count);
+            topPortsChart.update();
+        }
+
+        // Update IOC Display
+        function updateIOCDisplay() {
+            const box = document.getElementById('iocSummary');
+            if (!box) return;
+
+            if (iocs.ips.length === 0 && iocs.ports.length === 0 && iocs.signatures.length === 0) {
+                box.innerHTML = '<p style="color: var(--text-secondary);">No IOCs detected in current session.</p>';
+                return;
+            }
+
+            let html = '';
+            if (iocs.ips.length > 0) {
+                html += '<div class="mb-3"><h6><i class="bi bi-pc"></i> Malicious IPs</h6>';
+                iocs.ips.slice(0, 5).forEach(ip => {
+                    html += `<span class="ioc-badge me-1 mb-1" style="display: inline-block;">${ip}</span>`;
+                });
+                html += '</div>';
+            }
+            if (iocs.ports.length > 0) {
+                html += '<div class="mb-3"><h6><i class="bi bi-hdd-network"></i> Suspicious Ports</h6>';
+                iocs.ports.slice(0, 5).forEach(p => {
+                    html += `<span class="ioc-badge me-1 mb-1" style="display: inline-block;">${p}</span>`;
+                });
+                html += '</div>';
+            }
+            if (iocs.signatures.length > 0) {
+                html += '<div><h6><i class="bi bi-shield-exclamation"></i> Attack Signatures</h6>';
+                iocs.signatures.slice(0, 5).forEach(s => {
+                    html += `<span class="ioc-badge me-1 mb-1" style="display: inline-block;">${s}</span>`;
+                });
+                html += '</div>';
+            }
+
+            box.innerHTML = html;
+        }
+
+        // Clear Packets
+        function clearPackets() {
+            allPackets = [];
+            maliciousPackets = [];
+            updatePacketsTable();
+            updateRecentPacketsTable();
+            document.getElementById('maliciousCount').textContent = '0';
+            showNotification('Packets cleared', 'info');
+        }
+
+        // Export Packets
+        function exportPackets() {
+            const data = JSON.stringify(allPackets, null, 2);
+            downloadFile(data, 'packets.json', 'application/json');
+            showNotification('Packets exported', 'success');
+        }
+
+        // Import Packets
+        async function importPackets(file) {
+            if (!file) return;
+
+            try {
+                const text = await file.text();
+                let data;
+
+                if (file.name.endsWith('.json')) {
+                    data = JSON.parse(text);
+                    if (!Array.isArray(data)) data = [data];
+                } else if (file.name.endsWith('.csv')) {
+                    const lines = text.split('\n').filter(l => l.trim());
+                    const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+                    data = lines.slice(1).map(line => {
+                        const values = line.split(',');
+                        const obj = {};
+                        headers.forEach((h, i) => {
+                            obj[h] = values[i]?.trim() || '';
+                        });
+                        return obj;
+                    });
+                } else {
+                    showNotification('Unsupported file format', 'danger');
+                    return;
+                }
+
+                // Limit to 1000 packets
+                data = data.slice(0, 1000);
+
+                // Merge with existing
+                data.forEach(p => {
+                    if (!allPackets.find(existing => existing.id === p.id)) {
+                        allPackets.push(p);
+                    }
+                });
+
+                // Update malicious
+                maliciousPackets = allPackets.filter(p => p.is_threat);
+                document.getElementById('maliciousCount').textContent = maliciousPackets.length;
+
+                updatePacketsTable();
+                updateRecentPacketsTable();
+                showNotification(`Imported ${data.length} packets`, 'success');
+
+            } catch (e) {
+                console.error('Import error:', e);
+                showNotification('Failed to import file: ' + e.message, 'danger');
+            }
+        }
+
+        // Download File
+        function downloadFile(content, filename, type) {
+            const blob = new Blob([content], { type });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // Generate Report
+        function generateReport() {
+            const type = document.getElementById('reportType').value;
+            const format = document.getElementById('reportFormat').value;
+
+            let reportContent;
+            if (type === 'executive') {
+                reportContent = generateExecutiveReport();
+            } else if (type === 'detailed') {
+                reportContent = generateDetailedReport();
+            } else if (type === 'threats') {
+                reportContent = generateThreatReport();
+            } else if (type === 'incident') {
+                reportContent = generateIncidentReport();
+            } else {
+                reportContent = generateFullReport();
+            }
+
+            // Show preview
+            const preview = document.getElementById('reportPreview');
+            if (format === 'html') {
+                preview.innerHTML = reportContent;
+            } else {
+                preview.innerHTML = `<pre style="color: var(--text-primary);">${reportContent}</pre>`;
+            }
+
+            showNotification('Report generated', 'success');
+        }
+
+        // Generate Executive Report
+        function generateExecutiveReport() {
+            return `
+                <h4>Executive Summary Report</h4>
+                <h5>Overview</h5>
+                <table>
+                    <tr><th>Metric</th><th>Value</th></tr>
+                    <tr><td>Total Packets</td><td>${packetCount}</td></tr>
+                    <tr><td>Unique Source IPs</td><td>${new Set(allPackets.map(p => p.src_ip)).size}</td></tr>
+                    <tr><td>Unique Destination IPs</td><td>${new Set(allPackets.map(p => p.dst_ip)).size}</td></tr>
+                    <tr><td>Total Alerts</td><td>${allAlerts.length}</td></tr>
+                    <tr><td>Threats Detected</td><td>${maliciousPackets.length}</td></tr>
+                    <tr><td>Session Duration</td><td>${document.getElementById('sessionDuration').textContent}</td></tr>
+                </table>
+                <h5>Security Status</h5>
+                <p>${document.getElementById('securityPosture').textContent}</p>
+                <p>${document.getElementById('situationSummary').textContent}</p>
+            `;
+        }
+
+        // Generate Detailed Report
+        function generateDetailedReport() {
+            return `
+                <h4>Detailed Analysis Report</h4>
+                <h5>Traffic Statistics</h5>
+                <table>
+                    <tr><th>Metric</th><th>Value</th></tr>
+                    <tr><td>Total Packets</td><td>${packetCount}</td></tr>
+                    <tr><td>Total Bytes</td><td>${document.getElementById('statBytes').textContent}</td></tr>
+                    <tr><td>Packets/Second</td><td>${document.getElementById('statPps').textContent}</td></tr>
+                    <tr><td>Bytes/Second</td><td>${document.getElementById('statBps').textContent}</td></tr>
+                </table>
+                <h5>Top Source IPs</h5>
+                ${Object.entries(getTopSrcIps()).slice(0, 10).map(([ip, count]) => `<p>${ip}: ${count} packets</p>`).join('')}
+                <h5>Top Destination Ports</h5>
+                ${Object.entries(getTopDstPorts()).slice(0, 10).map(([port, count]) => `<p>Port ${port}: ${count} connections</p>`).join('')}
+            `;
+        }
+
+        // Generate Threat Report
+        function generateThreatReport() {
+            return `
+                <h4>Threat Analysis Report</h4>
+                <h5>Attack Distribution</h5>
+                <table>
+                    <tr><th>Attack Type</th><th>Count</th></tr>
+                    ${Object.entries(attackCounts).filter(([k]) => k !== 'BENIGN').map(([type, count]) => `<tr><td>${type}</td><td>${count}</td></tr>`).join('')}
+                </table>
+                <h5>Recent Alerts</h5>
+                ${allAlerts.slice(0, 20).map(a => `<p>[${a.severity}] ${a.title}: ${a.message}</p>`).join('')}
+            `;
+        }
+
+        // Generate Incident Report
+        function generateIncidentReport() {
+            const threats = allPackets.filter(p => p.is_threat);
+            return `
+                <h4>Incident Report</h4>
+                <h5>Incident Summary</h5>
+                <p>Total Incidents: ${threats.length}</p>
+                <h5>Incident Details</h5>
+                ${threats.slice(0, 50).map(t => `
+                    <div style="background: var(--bg-hover); padding: 10px; margin: 5px 0; border-radius: 4px;">
+                        <strong>${t.attack_type || 'Unknown Attack'}</strong><br>
+                        Source: ${t.src_ip}:${t.src_port}<br>
+                        Destination: ${t.dst_ip}:${t.dst_port}<br>
+                        Time: ${t.timestamp}<br>
+                        Confidence: ${((t.confidence || 0) * 100).toFixed(0)}%
+                    </div>
+                `).join('')}
+            `;
+        }
+
+        // Generate Full Report
+        function generateFullReport() {
+            return generateExecutiveReport() + generateDetailedReport() + generateThreatReport();
+        }
+
+        // Helper: Get Top Source IPs
+        function getTopSrcIps() {
+            const counts = {};
+            allPackets.forEach(p => {
+                if (p.src_ip) counts[p.src_ip] = (counts[p.src_ip] || 0) + 1;
+            });
+            return Object.fromEntries(Object.entries(counts).sort((a, b) => b[1] - a[1]));
+        }
+
+        // Helper: Get Top Destination Ports
+        function getTopDstPorts() {
+            const counts = {};
+            allPackets.forEach(p => {
+                if (p.dst_port) counts[p.dst_port] = (counts[p.dst_port] || 0) + 1;
+            });
+            return Object.fromEntries(Object.entries(counts).sort((a, b) => b[1] - a[1]));
+        }
+
+        // Show Malicious Packets
+        function showMaliciousPackets() {
+            if (maliciousPackets.length === 0) {
+                showNotification('No malicious packets detected', 'info');
+                return;
+            }
+
+            let html = `
+                <div class="modal fade" id="maliciousModal" tabindex="-1">
+                    <div class="modal-dialog modal-lg">
+                        <div class="modal-content" style="background: var(--bg-card); color: var(--text-primary);">
+                            <div class="modal-header">
+                                <h5 class="modal-title"><i class="bi bi-bug"></i> Malicious Packets (${maliciousPackets.length})</h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body" style="max-height: 500px; overflow-y: auto;">
+                                <table class="packet-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Time</th>
+                                            <th>Source</th>
+                                            <th>Destination</th>
+                                            <th>Type</th>
+                                            <th>Confidence</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${maliciousPackets.map(p => `
+                                            <tr>
+                                                <td>${p.timestamp || '--'}</td>
+                                                <td><span class="ip-badge">${p.src_ip}:${p.src_port}</span></td>
+                                                <td><span class="ip-badge">${p.dst_ip}:${p.dst_port}</span></td>
+                                                <td><span class="threat-badge dangerous">${p.attack_type || 'Unknown'}</span></td>
+                                                <td>${((p.confidence || 0) * 100).toFixed(0)}%</td>
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            const existing = document.getElementById('maliciousModal');
+            if (existing) existing.remove();
+
+            document.body.insertAdjacentHTML('beforeend', html);
+            const modal = new bootstrap.Modal(document.getElementById('maliciousModal'));
+            modal.show();
+            document.getElementById('maliciousModal').addEventListener('hidden.bs.modal', () => {
+                document.getElementById('maliciousModal')?.remove();
+                document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+                document.body.classList.remove('modal-open');
+                document.body.style.removeProperty('overflow');
+                document.body.style.removeProperty('padding-right');
+            });
+        }
+
+        // Show Notification
+        function showNotification(message, type) {
+            const container = document.getElementById('notificationContainer') || createNotificationContainer();
+            const id = 'notif-' + Date.now();
+            const bgColor = type === 'success' ? '#10b981' : type === 'danger' ? '#ef4444' : type === 'info' ? '#3b82f6' : '#f59e0b';
+
+            const html = `<div id="${id}" style="background: ${bgColor}; color: white; padding: 12px 20px; border-radius: 8px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; animation: slideIn 0.3s ease-out;">
+                <span>${message}</span>
+                <button onclick="document.getElementById('${id}').remove()" style="background: none; border: none; color: white; cursor: pointer; margin-left: 15px; font-size: 1.2rem;">&times;</button>
+            </div>`;
+
+            container.insertAdjacentHTML('beforeend', html);
+
+            setTimeout(() => {
+                const el = document.getElementById(id);
+                if (el) el.remove();
+            }, 5000);
+        }
+
+        // Create Notification Container
+        function createNotificationContainer() {
+            const div = document.createElement('div');
+            div.id = 'notificationContainer';
+            div.style.cssText = 'position: fixed; top: 20px; right: 20px; z-index: 9999; max-width: 400px;';
+            document.body.appendChild(div);
+            return div;
+        }
+
+        // Add slideIn animation
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes slideIn {
+                from { transform: translateX(100%); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
+            }
+        `;
+        document.head.appendChild(style);
+    </script>
+</body>
+</html>
