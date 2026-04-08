@@ -39,7 +39,7 @@ export const api = {
       `/packets/${id}`
     ),
   getPacketStats: () =>
-    request<{ success: boolean; data: any }>(`/packets/stats/overview`),
+    request<{ success: boolean; data: any }>(`/packets/stats`),
 
   // Stats
   getOverview: () =>
