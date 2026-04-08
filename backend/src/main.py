@@ -233,6 +233,30 @@ async def stats_overview(db: AsyncSession = Depends(get_db)):
     }
 
 
+@app.get("/api/stats/throughput")
+async def stats_throughput(db: AsyncSession = Depends(get_db)):
+    # Return recent packets as throughput data points
+    result = await db.execute(
+        select(CapturedPacket.timestamp, func.count(CapturedPacket.id), func.sum(CapturedPacket.length))
+        .group_by(func.round(func.julianday(CapturedPacket.timestamp) * 288))  # Group by 5-min windows
+        .order_by(CapturedPacket.timestamp.desc())
+        .limit(30)
+    )
+    rows = result.all()
+
+    series = []
+    for ts, count, length in rows:
+        series.append({
+            "timestamp": ts.isoformat() if ts else "",
+            "packets_per_second": count,
+            "bytes_per_second": length or 0,
+            "total_packets": count,
+            "active_alerts": 0,
+        })
+
+    return {"success": True, "series": series, "summary": {"avg_pps": 0, "peak_pps": 0, "avg_bps": 0, "peak_bps": 0}}
+
+
 @app.get("/api/stats/summary")
 async def stats_summary(db: AsyncSession = Depends(get_db)):
     # Get ALL alerts (not just unresolved)
